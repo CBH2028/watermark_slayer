@@ -30,6 +30,9 @@ import tempfile
 import shutil
 import subprocess
 import re
+import json
+import base64
+from io import BytesIO
 
 from florence_od_runtime import (
     DEFAULT_ADAPTER_DIR,
@@ -46,6 +49,133 @@ try:
     from cv2.typing import MatLike
 except ImportError:
     MatLike = np.ndarray
+
+
+LIVE_FRAME_PREFIX = "WM_SLAYER_LIVE_FRAME:"
+LIVE_FRAME_MAX_SIDE = 960
+LIVE_FRAME_JPEG_QUALITY = 82
+
+
+def _preview_image_payload(image: Image.Image):
+    """Build a compact browser image payload for live GUI updates."""
+    preview_image = image.convert("RGB").copy()
+    preview_image.thumbnail((LIVE_FRAME_MAX_SIDE, LIVE_FRAME_MAX_SIDE))
+    buffer = BytesIO()
+    preview_image.save(buffer, format="JPEG", quality=LIVE_FRAME_JPEG_QUALITY, optimize=True)
+    return {
+        "kind": "image",
+        "mime": "image/jpeg",
+        "data": base64.b64encode(buffer.getvalue()).decode("utf-8"),
+    }
+
+
+def _detection_items_from_boxes(image: Image.Image, boxes, output_label: str = "watermark"):
+    """Convert plain xyxy boxes into the same shape used by Florence detections."""
+    image_area = max(1, image.width * image.height)
+    items = []
+    for box in boxes or []:
+        if len(box) != 4:
+            continue
+        x1, y1, x2, y2 = [int(round(value)) for value in clamp_box_to_image(box, image.size)]
+        area_percent = ((x2 - x1) * (y2 - y1) / image_area) * 100
+        items.append({
+            "bbox": [x1, y1, x2, y2],
+            "area_percent": round(area_percent, 2),
+            "accepted": True,
+            "raw_label": output_label,
+            "query_label": output_label,
+            "output_label": output_label,
+        })
+    return items
+
+
+def _mask_from_detection_items(image: Image.Image, detections):
+    """Create an inpainting mask from accepted detection items."""
+    mask = Image.new("L", image.size, 0)
+    draw = ImageDraw.Draw(mask)
+
+    for item in detections or []:
+        x1, y1, x2, y2 = item["bbox"]
+        if item.get("accepted", True):
+            draw.rectangle([x1, y1, x2, y2], fill=255)
+        else:
+            logger.warning(f"Skipping large bounding box: {item['bbox']} covering {item['area_percent']:.2f}% of the image")
+
+    return mask
+
+
+def _draw_detection_preview(image: Image.Image, detections):
+    """Draw Florence boxes on a UI-only copy of the frame."""
+    annotated = image.convert("RGB").copy()
+    draw = ImageDraw.Draw(annotated)
+    line_width = max(2, min(8, annotated.width // 220))
+
+    for item in detections or []:
+        if not item.get("bbox") or len(item["bbox"]) != 4:
+            continue
+        x1, y1, x2, y2 = item["bbox"]
+        accepted = item.get("accepted", True)
+        color = (34, 197, 94) if accepted else (239, 68, 68)
+        draw.rectangle([x1, y1, x2, y2], outline=color, width=line_width)
+
+        label = str(item.get("raw_label") or item.get("query_label") or item.get("output_label") or "watermark")
+        area = item.get("area_percent")
+        if isinstance(area, (int, float)):
+            label = f"{label} {area:.1f}%"
+        text_x = max(0, x1)
+        text_y = max(0, y1 - 18)
+        try:
+            text_box = draw.textbbox((text_x, text_y), label)
+            pad = 3
+            draw.rectangle(
+                [text_box[0] - pad, text_box[1] - pad, text_box[2] + pad, text_box[3] + pad],
+                fill=(15, 23, 42),
+            )
+        except Exception:
+            pass
+        draw.text((text_x, text_y), label, fill=color)
+
+    return annotated
+
+
+def _live_detection_payload(detections):
+    """Trim detection objects to JSON-safe values for frontend display."""
+    payload = []
+    for item in detections or []:
+        if not item.get("bbox") or len(item["bbox"]) != 4:
+            continue
+        record = {
+            "bbox": [int(round(value)) for value in item["bbox"]],
+            "accepted": bool(item.get("accepted", True)),
+            "raw_label": str(item.get("raw_label") or ""),
+            "query_label": str(item.get("query_label") or ""),
+            "output_label": str(item.get("output_label") or ""),
+        }
+        area = item.get("area_percent")
+        if isinstance(area, (int, float, np.number)):
+            record["area_percent"] = round(float(area), 2)
+        score = item.get("score")
+        if isinstance(score, (int, float, np.number)):
+            record["score"] = float(score)
+        payload.append(record)
+    return payload
+
+
+def _emit_live_frame(phase: str, frame_number: int, total_frames: int, before_image: Image.Image = None, after_image: Image.Image = None, detections=None):
+    """Emit a structured live-frame event for the GUI bridge."""
+    payload = {
+        "phase": phase,
+        "frame": frame_number,
+        "frame_index": max(0, frame_number - 1),
+        "total_frames": total_frames,
+        "detections": _live_detection_payload(detections),
+    }
+    if before_image is not None:
+        payload["before"] = _preview_image_payload(before_image)
+    if after_image is not None:
+        payload["after"] = _preview_image_payload(after_image)
+
+    print(f"{LIVE_FRAME_PREFIX}{json.dumps(payload, separators=(',', ':'))}", flush=True)
 
 
 def fetch_inpaint_model():
@@ -308,17 +438,8 @@ def build_region_mask(image: MatLike, model: Florence2ForConditionalGeneration, 
         detection_classes: Raw class labels from a fine-tuned Florence-2 model.
         detection_output_label: Unified label used by the application for selected raw classes.
     """
-    mask = Image.new("L", image.size, 0)
-    draw = ImageDraw.Draw(mask)
-
-    for item in _list_detected_regions(image, model, processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams):
-        x1, y1, x2, y2 = item["bbox"]
-        if item["accepted"]:
-            draw.rectangle([x1, y1, x2, y2], fill=255)
-        else:
-            logger.warning(f"Skipping large bounding box: {item['bbox']} covering {item['area_percent']:.2f}% of the image")
-
-    return mask
+    detections = _list_detected_regions(image, model, processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
+    return _mask_from_detection_items(image, detections)
 
 
 def preview_detected_regions(image: MatLike, model: Florence2ForConditionalGeneration, processor: AutoProcessor, device: str, max_bbox_percent: float, detection_prompt: str = "watermark", detection_classes=None, detection_output_label: str = "watermark", detection_task: str = "auto", florence_max_new_tokens: int = 256, florence_num_beams: int = 3):
@@ -421,8 +542,14 @@ def process_video_framewise(input_path, output_path, florence_model, florence_pr
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             pil_image = Image.fromarray(frame_rgb)
             
+            # Run Florence and show the UI-only boxed frame before inpainting.
+            detection_result = preview_detector_payload(pil_image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
+            detections = detection_result["detections"]
+            annotated_frame = _draw_detection_preview(pil_image, detections)
+            _emit_live_frame("detected", frame_count + 1, total_frames, before_image=annotated_frame, detections=detections)
+
             # Get watermark mask
-            mask_image = build_region_mask(pil_image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
+            mask_image = _mask_from_detection_items(pil_image, detections)
             
             # Process frame
             if transparent:
@@ -439,6 +566,7 @@ def process_video_framewise(input_path, output_path, florence_model, florence_pr
             # Convert back to OpenCV format and write to output video
             frame_result = cv2.cvtColor(np.array(result_image), cv2.COLOR_RGB2BGR)
             out.write(frame_result)
+            _emit_live_frame("processed", frame_count + 1, total_frames, after_image=result_image, detections=detections)
             
             # Update progress
             frame_count += 1
@@ -548,7 +676,10 @@ def process_video_timeline_passes(input_path, output_path, florence_model, flore
                 break
 
             pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            bboxes = preview_detected_regions(pil_image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
+            detection_result = preview_detector_payload(pil_image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
+            bboxes = detection_result["detections"]
+            annotated_frame = _draw_detection_preview(pil_image, bboxes)
+            _emit_live_frame("detected", frame_idx + 1, total_frames, before_image=annotated_frame, detections=bboxes)
 
             if bboxes:
                 accepted_bboxes = [b["bbox"] for b in bboxes if b["accepted"]]
@@ -610,16 +741,19 @@ def process_video_timeline_passes(input_path, output_path, florence_model, flore
             if not ret:
                 break
 
+            pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            frame_detections = _detection_items_from_boxes(
+                pil_image,
+                frame_masks.get(frame_idx, []),
+                detection_output_label,
+            )
+            annotated_frame = _draw_detection_preview(pil_image, frame_detections)
+            _emit_live_frame("detected", frame_idx + 1, total_frames, before_image=annotated_frame, detections=frame_detections)
+
             if frame_idx in frame_masks:
                 # This frame needs inpainting
-                pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-
                 # Create mask from bboxes
-                mask = Image.new("L", pil_image.size, 0)
-                draw = ImageDraw.Draw(mask)
-                for bbox in frame_masks[frame_idx]:
-                    x1, y1, x2, y2 = bbox
-                    draw.rectangle([x1, y1, x2, y2], fill=255)
+                mask = _mask_from_detection_items(pil_image, frame_detections)
 
                 # Apply inpainting or transparency
                 if transparent:
@@ -634,9 +768,11 @@ def process_video_timeline_passes(input_path, output_path, florence_model, flore
                 frame_result = cv2.cvtColor(np.array(result_image), cv2.COLOR_RGB2BGR)
             else:
                 # No watermark detected for this frame, copy original
+                result_image = pil_image
                 frame_result = frame
 
             out.write(frame_result)
+            _emit_live_frame("processed", frame_idx + 1, total_frames, after_image=result_image, detections=frame_detections)
             frame_idx += 1
             pbar.update(1)
             local_progress = 0.5 + (frame_idx / total_frames) * 0.5  # Pass 2 = 50-100% local

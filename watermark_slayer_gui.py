@@ -51,6 +51,7 @@ DEFAULT_OUTPUT_PATH = "/home/h3c/cbh_ws/water_marked/outputs"
 IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.bmp'}
 VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm'}
 MEDIA_PREVIEW_MAX_SIDE = 1600
+LIVE_FRAME_PREFIX = "WM_SLAYER_LIVE_FRAME:"
 
 
 def normalize_runtime_path(path):
@@ -487,6 +488,14 @@ class SlayerBridge:
 
                 line = line.strip()
                 if not line:
+                    continue
+
+                if line.startswith(LIVE_FRAME_PREFIX):
+                    try:
+                        live_frame = json.loads(line[len(LIVE_FRAME_PREFIX):])
+                        self._send_frontend_event(f'processingFrame({json.dumps(live_frame)})')
+                    except json.JSONDecodeError:
+                        pass
                     continue
 
                 # Parse progress

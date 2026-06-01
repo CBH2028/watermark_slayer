@@ -389,7 +389,7 @@
             },
             model_settings: { title: 'Florence Model', model_id: 'Model folder', adapter_dir: 'Adapter folder', max_new_tokens: 'Max tokens', num_beams: 'Beams', use_fast_processor: 'Fast processor' },
             buttons: { preview: 'Preview Detection', preview_loading: 'Detecting...', start: 'Start Processing', start_processing: 'Processing...', stop: 'Stop', select_input: 'Select Input', try_again: 'Run Again', close: 'Close' },
-            compare: { title: 'Before / After', subtitle: 'Detection preview and processed output stay side by side.', waiting: 'Waiting', detecting: 'Detection preview', processing: 'Processing', done: 'Processed', before: 'Before', after: 'After', before_empty: 'Select an image or video.', after_empty: 'Detection boxes or processed output will appear here.', play: 'Play', pause: 'Pause', progress: 'Progress', speed: 'Speed' },
+            compare: { title: 'Before / After', subtitle: 'Detection preview and processed output stay side by side.', waiting: 'Waiting', detecting: 'Detection preview', processing: 'Processing', frame_detected: 'Florence frame detected', frame_processed: 'iopaint frame processed', done: 'Processed', before: 'Before', after: 'After', before_empty: 'Select an image or video.', after_empty: 'Detection boxes or processed output will appear here.', before_frame: 'Frame {frame}/{total} · Florence boxes', after_frame: 'Frame {frame}/{total} · iopaint result', live_detected: 'Florence detected frame {frame}/{total}', live_processed: 'iopaint processed frame {frame}/{total}', play: 'Play', pause: 'Pause', progress: 'Progress', speed: 'Speed' },
             dropzone: { title: 'Select a file or folder', subtitle: 'Images, videos, and batch folders are supported', video_hint: 'Video file', image_hint: 'Image file', folder_hint: 'Batch folder' },
             output: { placeholder: 'Defaults to the input folder' },
             status_bar: { cuda: 'CUDA', ffmpeg: 'FFmpeg', ram: 'RAM', on: 'Available', off: 'Unavailable', cpu_mode: 'CPU Mode' },
@@ -467,7 +467,7 @@
             logSeq: Date.now(),
             systemInfo: { cuda: false, gpu: '--', ffmpeg: false, ram: 0 },
             preview: { loading: false, error: '', image: '', detections: [], prompt: '', source: '', generatedText: '', predictionsRaw: [], parsed: null },
-            compare: { before: null, after: null, status: 'waiting', outputPath: '', speed: 1, timeline: 0, playing: false },
+            compare: { before: null, after: null, status: 'waiting', outputPath: '', speed: 1, timeline: 0, playing: false, liveFrame: null },
             florenceTest: {
                 modelId: '/home/h3c/cbh_ws/florence_train/fused_model',
                 adapterDir: '',
@@ -1019,6 +1019,7 @@
             appState.statusMsg = text('processing_status.0', text('logs.cooking'));
             appState.compare.status = 'processing';
             appState.compare.outputPath = '';
+            appState.compare.liveFrame = null;
             appendLogLine(text('logs.starting'), 'info');
             appendLogLine(text('logs.first_run_hint'), 'muted');
             beginStatusTicker();
@@ -1026,7 +1027,13 @@
 
             try {
                 await loadSourceMedia();
-                await prepareDetectionPane();
+                if (pathIsVideo(appState.inputPath)) {
+                    appState.compare.after = null;
+                    appState.compare.status = 'processing';
+                    renderComparisonPane();
+                } else {
+                    await prepareDetectionPane();
+                }
                 const result = await slayerApi().launch_slayer_job({
                     input: normalizeRuntimePath(appState.inputPath),
                     output: normalizeRuntimePath(appState.outputPath),
@@ -1355,7 +1362,8 @@
             dom.compareBeforeName.textContent = before ? (before.name || formatPathLabel(before.path)) : '-';
             dom.compareAfterName.textContent = after ? (after.name || formatPathLabel(after.path)) : '-';
 
-            const statusKey = appState.compare.status === 'detecting' ? 'detecting' : (appState.processing ? 'processing' : appState.compare.status);
+            const liveStatuses = ['detecting', 'frame_detected', 'frame_processed'];
+            const statusKey = liveStatuses.includes(appState.compare.status) ? appState.compare.status : (appState.processing ? 'processing' : appState.compare.status);
             dom.compareStatus.textContent = text(`compare.${statusKey}`, text('compare.waiting'));
 
             const videoReady = before && after && before.kind === 'video' && after.kind === 'video';
@@ -1442,6 +1450,44 @@
             appState.compare.playing = false;
             renderComparisonPane();
             applyPlaybackRate();
+        }
+
+        function formatLiveFrameText(key, payload) {
+            const frame = payload && payload.frame ? payload.frame : '-';
+            const total = payload && payload.total_frames ? payload.total_frames : '-';
+            return text(key).replace('{frame}', frame).replace('{total}', total);
+        }
+
+        function liveFrameMedia(source, payload, side) {
+            if (!source || !source.data) return null;
+            return {
+                kind: 'image',
+                mime: source.mime || 'image/jpeg',
+                data: source.data,
+                data_url: source.data_url || '',
+                name: formatLiveFrameText(side === 'before' ? 'compare.before_frame' : 'compare.after_frame', payload),
+                path: appState.inputPath
+            };
+        }
+
+        function applyLiveProcessingFrame(payload) {
+            if (!payload) return;
+            appState.compare.liveFrame = payload;
+
+            const before = liveFrameMedia(payload.before, payload, 'before');
+            const after = liveFrameMedia(payload.after, payload, 'after');
+            if (before) appState.compare.before = before;
+            if (after) appState.compare.after = after;
+
+            const isProcessed = payload.phase === 'processed';
+            appState.compare.status = isProcessed ? 'frame_processed' : 'frame_detected';
+            appState.statusMsg = formatLiveFrameText(isProcessed ? 'compare.live_processed' : 'compare.live_detected', payload);
+
+            if (payload.total_frames) {
+                appState.compare.timeline = Math.max(0, Math.min(1000, Math.round(((payload.frame || 0) / payload.total_frames) * 1000)));
+            }
+            renderComparisonPane();
+            renderProgressState();
         }
 
         function comparisonDuration() {
@@ -1605,11 +1651,18 @@
             window.processingOutput = media => {
                 applyProcessedMedia(media);
             };
+            window.processingFrame = payload => {
+                applyLiveProcessingFrame(payload);
+            };
             window.processingOutputPath = async path => {
                 path = normalizeRuntimePath(path);
                 if (!slayerApi() || !path) return;
                 try {
                     const media = await slayerApi().fetch_media_payload(path);
+                    if (media && media.kind === 'video' && pathIsVideo(appState.inputPath)) {
+                        const source = await slayerApi().fetch_media_payload(appState.inputPath);
+                        if (source && !source.error) appState.compare.before = source;
+                    }
                     applyProcessedMedia(media);
                 } catch (error) {
                     appendLogLine(error.message, 'warning');
