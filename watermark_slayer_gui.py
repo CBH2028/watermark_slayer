@@ -28,9 +28,11 @@ import yaml
 import base64
 import mimetypes
 import re
+import secrets
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import quote, unquote, urlparse
 
 from PIL import Image, ImageOps
 
@@ -104,6 +106,11 @@ class SlayerBridge:
         self._slayer_process = None
         self._job_active = False
         self._ui_state = self._read_ui_state()
+        self._media_routes = {}
+        self._media_tokens = {}
+        self._media_server = None
+        self._media_server_thread = None
+        self._media_server_port = None
 
     def attach_window(self, window):
         """Set the webview window reference"""
@@ -168,6 +175,145 @@ class SlayerBridge:
         result = self._frontend_window.create_file_dialog(webview.FileDialog.FOLDER)
         return normalize_runtime_path(result[0]) if result else None
 
+    def _ensure_media_server(self):
+        """Start a local read-only HTTP server for video playback."""
+        if self._media_server:
+            return
+
+        routes = self._media_routes
+
+        class MediaHandler(BaseHTTPRequestHandler):
+            server_version = "WatermarkSlayerMedia/1.0"
+
+            def log_message(self, *_args):
+                return
+
+            def do_OPTIONS(self):
+                self.send_response(204)
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
+                self.send_header('Access-Control-Allow-Headers', 'Range')
+                self.end_headers()
+
+            def do_HEAD(self):
+                self._serve_media(send_body=False)
+
+            def do_GET(self):
+                self._serve_media(send_body=True)
+
+            def _serve_media(self, send_body=True):
+                parsed = urlparse(self.path)
+                parts = parsed.path.strip('/').split('/')
+                if len(parts) < 2 or parts[0] != 'media':
+                    self.send_error(404)
+                    return
+
+                media_path = routes.get(parts[1])
+                if not media_path:
+                    self.send_error(404)
+                    return
+
+                path = Path(media_path)
+                if not path.exists() or not path.is_file():
+                    self.send_error(404)
+                    return
+
+                file_size = path.stat().st_size
+                start = 0
+                end = file_size - 1
+                status = 200
+
+                range_header = self.headers.get('Range', '')
+                range_match = re.match(r'bytes=(\d*)-(\d*)', range_header)
+                if range_match:
+                    raw_start, raw_end = range_match.groups()
+                    if raw_start:
+                        start = int(raw_start)
+                    if raw_end:
+                        end = int(raw_end)
+                    end = min(end, file_size - 1)
+                    if start > end or start >= file_size:
+                        self.send_response(416)
+                        self.send_header('Content-Range', f'bytes */{file_size}')
+                        self.send_header('Access-Control-Allow-Origin', '*')
+                        self.end_headers()
+                        return
+                    status = 206
+
+                content_length = end - start + 1
+                mime = mimetypes.guess_type(str(path))[0] or 'application/octet-stream'
+                self.send_response(status)
+                self.send_header('Content-Type', mime)
+                self.send_header('Content-Length', str(content_length))
+                self.send_header('Accept-Ranges', 'bytes')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Cache-Control', 'no-store')
+                if status == 206:
+                    self.send_header('Content-Range', f'bytes {start}-{end}/{file_size}')
+                self.end_headers()
+
+                if not send_body:
+                    return
+
+                with path.open('rb') as media_file:
+                    media_file.seek(start)
+                    remaining = content_length
+                    while remaining > 0:
+                        chunk = media_file.read(min(1024 * 1024, remaining))
+                        if not chunk:
+                            break
+                        try:
+                            self.wfile.write(chunk)
+                        except (BrokenPipeError, ConnectionResetError):
+                            break
+                        remaining -= len(chunk)
+
+        self._media_server = ThreadingHTTPServer(('127.0.0.1', 0), MediaHandler)
+        self._media_server.daemon_threads = True
+        self._media_server_port = self._media_server.server_address[1]
+        self._media_server_thread = threading.Thread(
+            target=self._media_server.serve_forever,
+            daemon=True
+        )
+        self._media_server_thread.start()
+
+    def _media_server_url(self, media_path):
+        """Return a browser-safe local URL for a media file."""
+        self._ensure_media_server()
+        resolved = str(Path(media_path).resolve())
+        token = self._media_tokens.get(resolved)
+        if not token:
+            token = secrets.token_urlsafe(16)
+            self._media_tokens[resolved] = token
+            self._media_routes[token] = resolved
+
+        name = quote(Path(media_path).name)
+        return f"http://127.0.0.1:{self._media_server_port}/media/{token}/{name}"
+
+    def _video_poster_payload(self, media_path):
+        """Extract a compact first-frame poster for video fallback display."""
+        try:
+            import cv2
+
+            cap = cv2.VideoCapture(str(media_path))
+            ret, frame = cap.read()
+            cap.release()
+            if not ret:
+                return {}
+
+            image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            image.thumbnail((MEDIA_PREVIEW_MAX_SIDE, MEDIA_PREVIEW_MAX_SIDE))
+            buffer = BytesIO()
+            image.save(buffer, format="JPEG", quality=86, optimize=True)
+            data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            return {
+                'poster_mime': 'image/jpeg',
+                'poster_data': data,
+                'poster_data_url': f"data:image/jpeg;base64,{data}",
+            }
+        except Exception:
+            return {}
+
     def _build_media_payload(self, path, include_data=True):
         """Return a browser-displayable payload for an image or video path."""
         if not path:
@@ -183,7 +329,6 @@ class SlayerBridge:
             'path': normalize_runtime_path(media_path.resolve()),
             'name': media_path.name,
             'suffix': suffix,
-            'url': media_path.resolve().as_uri(),
         }
 
         if suffix in IMAGE_EXTENSIONS:
@@ -191,6 +336,7 @@ class SlayerBridge:
             payload.update({
                 'kind': 'image',
                 'mime': mime,
+                'url': media_path.resolve().as_uri(),
             })
             if include_data:
                 with Image.open(media_path) as image:
@@ -209,7 +355,10 @@ class SlayerBridge:
             payload.update({
                 'kind': 'video',
                 'mime': mimetypes.guess_type(str(media_path))[0] or 'video/mp4',
+                'url': self._media_server_url(media_path),
             })
+            if include_data:
+                payload.update(self._video_poster_payload(media_path))
             return payload
 
         return {'error': f'Unsupported media type: {path}'}

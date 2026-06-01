@@ -227,7 +227,7 @@
                         </div>
                         <div class="compare-media">
                             <img id="compareBeforeImage" class="hidden" alt="Before image">
-                            <video id="compareBeforeVideo" class="hidden" muted playsinline></video>
+                            <video id="compareBeforeVideo" class="hidden" muted playsinline preload="metadata"></video>
                             <div id="compareBeforeEmpty" class="compare-empty" data-i18n="compare.before_empty">Select an image or video.</div>
                         </div>
                     </div>
@@ -239,7 +239,7 @@
                         </div>
                         <div class="compare-media">
                             <img id="compareAfterImage" class="hidden" alt="After image">
-                            <video id="compareAfterVideo" class="hidden" muted playsinline></video>
+                            <video id="compareAfterVideo" class="hidden" muted playsinline preload="metadata"></video>
                             <div id="compareAfterEmpty" class="compare-empty" data-i18n="compare.after_empty">Detection boxes or processed output will appear here.</div>
                         </div>
                     </div>
@@ -265,52 +265,54 @@
                 </div>
             </section>
 
-            <section class="status-layout">
-                <div class="panel progress-panel">
-                    <div class="panel-head">
-                        <h3 data-i18n="labels.progress">Progress</h3>
-                        <span id="statusText" data-i18n="labels.idle">Idle</span>
+            <section class="runtime-layout">
+                <div class="status-stack">
+                    <div class="panel progress-panel">
+                        <div class="panel-head">
+                            <h3 data-i18n="labels.progress">Progress</h3>
+                            <span id="statusText" data-i18n="labels.idle">Idle</span>
+                        </div>
+                        <div class="progress-track" aria-label="Progress">
+                            <div id="progressFill" class="progress-fill"></div>
+                        </div>
+                        <div class="progress-meta">
+                            <span id="progressValue">0%</span>
+                            <span id="statusMessage">Ready</span>
+                        </div>
                     </div>
-                    <div class="progress-track" aria-label="Progress">
-                        <div id="progressFill" class="progress-fill"></div>
-                    </div>
-                    <div class="progress-meta">
-                        <span id="progressValue">0%</span>
-                        <span id="statusMessage">Ready</span>
+
+                    <div class="panel system-panel">
+                        <div class="panel-head">
+                            <h3 data-i18n="sections.system">System</h3>
+                        </div>
+                        <div class="system-grid">
+                            <div class="system-item">
+                                <span data-i18n="status_bar.cuda">CUDA</span>
+                                <strong id="cudaState">--</strong>
+                            </div>
+                            <div class="system-item">
+                                <span data-i18n="status_bar.ffmpeg">FFmpeg</span>
+                                <strong id="ffmpegState">--</strong>
+                            </div>
+                            <div class="system-item">
+                                <span data-i18n="status_bar.ram">RAM</span>
+                                <strong id="ramState">--</strong>
+                            </div>
+                            <div class="system-item wide">
+                                <span>Device</span>
+                                <strong id="gpuState">--</strong>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="panel system-panel">
+                <section class="panel log-panel">
                     <div class="panel-head">
-                        <h3 data-i18n="sections.system">System</h3>
+                        <h3 data-i18n="sections.logs">Logs</h3>
+                        <button id="clearLogs" type="button" class="text-button">Clear</button>
                     </div>
-                    <div class="system-grid">
-                        <div class="system-item">
-                            <span data-i18n="status_bar.cuda">CUDA</span>
-                            <strong id="cudaState">--</strong>
-                        </div>
-                        <div class="system-item">
-                            <span data-i18n="status_bar.ffmpeg">FFmpeg</span>
-                            <strong id="ffmpegState">--</strong>
-                        </div>
-                        <div class="system-item">
-                            <span data-i18n="status_bar.ram">RAM</span>
-                            <strong id="ramState">--</strong>
-                        </div>
-                        <div class="system-item wide">
-                            <span>Device</span>
-                            <strong id="gpuState">--</strong>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="panel log-panel">
-                <div class="panel-head">
-                    <h3 data-i18n="sections.logs">Logs</h3>
-                    <button id="clearLogs" type="button" class="text-button">Clear</button>
-                </div>
-                <div id="logs" class="logs" aria-live="polite"></div>
+                    <div id="logs" class="logs" aria-live="polite"></div>
+                </section>
             </section>
         </main>
     </div>
@@ -1328,10 +1330,12 @@
             const src = mediaSourceUrl(media);
             const isImage = media && media.kind === 'image' && src;
             const isVideo = media && media.kind === 'video' && src;
+            const posterSrc = isVideo && (media.poster_data_url || (media.poster_data ? `data:${media.poster_mime || 'image/jpeg'};base64,${media.poster_data}` : ''));
+            const showPoster = isVideo && posterSrc;
 
-            toggleHidden(imgEl, !isImage);
-            toggleHidden(videoEl, !isVideo);
-            toggleHidden(emptyEl, Boolean(isImage || isVideo));
+            toggleHidden(imgEl, !(isImage || showPoster));
+            toggleHidden(videoEl, true);
+            toggleHidden(emptyEl, Boolean(isImage || isVideo || showPoster));
 
             if (isImage) {
                 imgEl.onerror = () => {
@@ -1347,9 +1351,32 @@
             }
             if (isVideo && videoEl.dataset.src !== src) {
                 videoEl.pause();
+                if (posterSrc) {
+                    imgEl.src = posterSrc;
+                    imgEl.dataset.loaded = 'poster';
+                    videoEl.poster = posterSrc;
+                }
+                videoEl.onerror = () => {
+                    appendLogLine(`Video failed to load: ${media.path || media.name || src}`, 'warning');
+                    toggleHidden(videoEl, true);
+                    toggleHidden(imgEl, !posterSrc);
+                };
+                videoEl.onloadedmetadata = () => {
+                    if (Number.isFinite(videoEl.duration) && videoEl.duration > 0) {
+                        videoEl.currentTime = 0;
+                    }
+                };
+                videoEl.onloadeddata = () => {
+                    toggleHidden(imgEl, true);
+                    toggleHidden(videoEl, false);
+                };
                 videoEl.src = src;
                 videoEl.dataset.src = src;
                 videoEl.load();
+            }
+            if (isVideo && videoEl.dataset.src === src && videoEl.readyState >= 2) {
+                toggleHidden(imgEl, true);
+                toggleHidden(videoEl, false);
             }
         }
 

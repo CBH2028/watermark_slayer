@@ -568,9 +568,18 @@ select {
     color: var(--muted);
 }
 
-.status-layout {
+.runtime-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+    grid-template-columns: minmax(280px, 0.75fr) minmax(380px, 1.25fr);
+    gap: 16px;
+    flex: 1 1 360px;
+    min-height: 360px;
+}
+
+.status-stack {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
     gap: 16px;
 }
 
@@ -850,29 +859,30 @@ select {
 
 .log-panel {
     flex: 1;
-    min-height: 240px;
+    min-height: 0;
     display: flex;
     flex-direction: column;
 }
 
 .logs {
     flex: 1;
-    min-height: 180px;
-    max-height: 360px;
+    min-height: 260px;
+    max-height: none;
     overflow: auto;
-    padding: 10px;
+    padding: 12px;
     border-radius: 8px;
     background: var(--surface-2);
     border: 1px solid var(--border);
     font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-    font-size: 12px;
+    font-size: 14px;
+    line-height: 1.55;
 }
 
 .log-row {
     display: grid;
-    grid-template-columns: 76px minmax(0, 1fr);
-    gap: 10px;
-    padding: 6px 0;
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 12px;
+    padding: 8px 0;
     border-bottom: 1px solid rgba(128, 143, 160, 0.12);
 }
 
@@ -1128,8 +1138,9 @@ select {
         overflow: visible;
     }
 
-    .status-layout {
+    .runtime-layout {
         grid-template-columns: 1fr;
+        min-height: 0;
     }
 
     .compare-grid,

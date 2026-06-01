@@ -590,18 +590,35 @@ def process_video_framewise(input_path, output_path, florence_model, florence_pr
             logger.warning("FFmpeg is not available. Video will be produced without audio.")
             shutil.copy(str(temp_video_path), str(output_file))
         else:
-            # Use FFmpeg to combine processed video with original audio
-            ffmpeg_cmd = [
-                "ffmpeg", "-y",
-                "-i", str(temp_video_path),  # Processed video without audio
-                "-i", str(input_path),       # Original video with audio
-                "-c:v", "copy",              # Copy video without re-encoding
-                "-c:a", "aac",               # Encode audio as AAC for better compatibility
-                "-map", "0:v:0",             # Use video track from first file (processed video)
-                "-map", "1:a:0",             # Use audio track from second file (original video)
-                "-shortest",                  # End when the shortest track ends
-                str(output_file)
-            ]
+            # Re-encode MP4 as H.264/AAC so the GUI/browser has the best chance to play it.
+            if output_format.upper() == "MP4":
+                ffmpeg_cmd = [
+                    "ffmpeg", "-y",
+                    "-i", str(temp_video_path),
+                    "-i", str(input_path),
+                    "-c:v", "libx264",
+                    "-preset", "veryfast",
+                    "-crf", "18",
+                    "-pix_fmt", "yuv420p",
+                    "-c:a", "aac",
+                    "-map", "0:v:0",
+                    "-map", "1:a:0?",
+                    "-shortest",
+                    "-movflags", "+faststart",
+                    str(output_file)
+                ]
+            else:
+                ffmpeg_cmd = [
+                    "ffmpeg", "-y",
+                    "-i", str(temp_video_path),
+                    "-i", str(input_path),
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    "-map", "0:v:0",
+                    "-map", "1:a:0?",
+                    "-shortest",
+                    str(output_file)
+                ]
 
             # Execute FFmpeg
             subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -791,17 +808,34 @@ def process_video_timeline_passes(input_path, output_path, florence_model, flore
             logger.warning("FFmpeg is not available. Video will be produced without audio.")
             shutil.copy(str(temp_video_path), str(output_file))
         else:
-            ffmpeg_cmd = [
-                "ffmpeg", "-y",
-                "-i", str(temp_video_path),
-                "-i", str(input_path),
-                "-c:v", "copy",
-                "-c:a", "aac",
-                "-map", "0:v:0",
-                "-map", "1:a:0",
-                "-shortest",
-                str(output_file)
-            ]
+            if output_format.upper() == "MP4":
+                ffmpeg_cmd = [
+                    "ffmpeg", "-y",
+                    "-i", str(temp_video_path),
+                    "-i", str(input_path),
+                    "-c:v", "libx264",
+                    "-preset", "veryfast",
+                    "-crf", "18",
+                    "-pix_fmt", "yuv420p",
+                    "-c:a", "aac",
+                    "-map", "0:v:0",
+                    "-map", "1:a:0?",
+                    "-shortest",
+                    "-movflags", "+faststart",
+                    str(output_file)
+                ]
+            else:
+                ffmpeg_cmd = [
+                    "ffmpeg", "-y",
+                    "-i", str(temp_video_path),
+                    "-i", str(input_path),
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    "-map", "0:v:0",
+                    "-map", "1:a:0?",
+                    "-shortest",
+                    str(output_file)
+                ]
             subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             logger.info("Audio/video merge completed successfully!")
     except Exception as e:
