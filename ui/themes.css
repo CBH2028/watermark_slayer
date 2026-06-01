@@ -963,6 +963,11 @@ select {
     box-shadow: var(--shadow);
 }
 
+.process-surface {
+    width: min(1180px, 100%);
+    max-height: min(860px, calc(100vh - 48px));
+}
+
 .modal-head {
     display: flex;
     justify-content: space-between;
@@ -996,6 +1001,51 @@ select {
     object-fit: contain;
     border-radius: 6px;
     border: 1px solid var(--border);
+}
+
+.process-live-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    padding: 18px;
+}
+
+.process-frame-card {
+    min-width: 0;
+}
+
+.process-frame-stage {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    min-height: 260px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #000;
+}
+
+.process-frame-stage img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+}
+
+.process-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 16px 18px 18px;
+    border-top: 1px solid var(--border);
+}
+
+.process-modal-footer span {
+    min-width: 0;
+    color: var(--muted);
+    overflow-wrap: anywhere;
 }
 
 .preview-state {
@@ -1144,6 +1194,7 @@ select {
     }
 
     .compare-grid,
+    .process-live-grid,
     .test-result-layout,
     .test-json-grid {
         grid-template-columns: 1fr;

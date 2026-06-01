@@ -152,6 +152,13 @@
     "loading": "正在检测...",
     "loading_hint": "首次运行可能需要下载模型。"
   },
+  "process_modal": {
+    "eyebrow": "处理预览",
+    "title": "实时处理前后图",
+    "waiting": "等待处理帧...",
+    "before_empty": "等待当前处理前帧。",
+    "after_empty": "等待当前处理后帧。"
+  },
   "processing_status": [
     "准备模型...",
     "检测水印区域...",

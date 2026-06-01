@@ -152,6 +152,13 @@
     "loading": "Detecting...",
     "loading_hint": "The first run may need to download model files."
   },
+  "process_modal": {
+    "eyebrow": "Processing Preview",
+    "title": "Live Before / After",
+    "waiting": "Waiting for frames...",
+    "before_empty": "Waiting for the current frame.",
+    "after_empty": "Waiting for the processed frame."
+  },
   "processing_status": [
     "Preparing models...",
     "Detecting watermark regions...",

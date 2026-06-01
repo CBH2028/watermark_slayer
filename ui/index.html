@@ -370,6 +370,44 @@
         </div>
     </div>
 
+    <div id="processModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="processModalTitle">
+        <div class="modal-surface process-surface">
+            <header class="modal-head">
+                <div>
+                    <p class="eyebrow" data-i18n="process_modal.eyebrow">Processing Preview</p>
+                    <h2 id="processModalTitle" data-i18n="process_modal.title">Live Before / After</h2>
+                </div>
+                <button id="closeProcessModal" type="button" class="icon-button close" aria-label="Close">x</button>
+            </header>
+            <div class="process-live-grid">
+                <div class="process-frame-card">
+                    <div class="compare-pane-head">
+                        <h4 data-i18n="compare.before">Before</h4>
+                        <span id="processBeforeName">-</span>
+                    </div>
+                    <div class="process-frame-stage">
+                        <img id="processBeforeImage" class="hidden" alt="Processing before">
+                        <div id="processBeforeEmpty" class="compare-empty" data-i18n="process_modal.before_empty">Waiting for the current frame.</div>
+                    </div>
+                </div>
+                <div class="process-frame-card">
+                    <div class="compare-pane-head">
+                        <h4 data-i18n="compare.after">After</h4>
+                        <span id="processAfterName">-</span>
+                    </div>
+                    <div class="process-frame-stage">
+                        <img id="processAfterImage" class="hidden" alt="Processing after">
+                        <div id="processAfterEmpty" class="compare-empty" data-i18n="process_modal.after_empty">Waiting for the processed frame.</div>
+                    </div>
+                </div>
+            </div>
+            <footer class="process-modal-footer">
+                <span id="processModalStatus" data-i18n="process_modal.waiting">Waiting for frames...</span>
+                <button id="closeProcessModalFooter" type="button" class="primary-button compact" data-i18n="buttons.close">Close</button>
+            </footer>
+        </div>
+    </div>
+
     <script>
         const defaultCopy = {
             app: { title: 'Watermark Slayer', subtitle: 'Local AI watermark detection and inpainting' },
@@ -396,6 +434,7 @@
             output: { placeholder: 'Defaults to the input folder' },
             status_bar: { cuda: 'CUDA', ffmpeg: 'FFmpeg', ram: 'RAM', on: 'Available', off: 'Unavailable', cpu_mode: 'CPU Mode' },
             preview_modal: { title: 'Detection Preview', prompt: 'Prompt:', detected: 'Detected:', source: 'Source:', regions: 'region(s)', bounding_boxes: 'Bounding Boxes', generated_text: 'Florence Generated Text', predictions_raw: 'Raw OD Predictions', of_image: '% of image', too_large: 'Skipped', loading: 'Detecting...', loading_hint: 'The first run may need to download model files.' },
+            process_modal: { eyebrow: 'Processing Preview', title: 'Live Before / After', waiting: 'Waiting for frames...', before_empty: 'Waiting for the current frame.', after_empty: 'Waiting for the processed frame.' },
             processing_status: ['Preparing models...', 'Detecting watermark regions...', 'Building masks...', 'Running inpainting...', 'Writing output...'],
             logs: { init: 'Interface ready.', starting: 'Processing started.', first_run_hint: 'First run may download model files.', done: 'Processing complete.', stopped: 'Task stopped.', no_input: 'Select an input path first.', ghost_video_warning: 'Transparent mode is not supported for videos. It has been disabled.', no_ffmpeg: 'FFmpeg was not detected. Video output may not include audio.', api_error: 'Backend API is unavailable. Start the app with run.sh or run.bat.', preview_failed: 'Preview failed:', preview_result: 'Detected {total} region(s); {accepted} will be processed.', cooking: 'Processing...' },
             labels: { theme: 'Theme', language: 'Language', input_path: 'Input path', output_path: 'Output path', current_file: 'Current input', idle: 'Idle', progress: 'Progress', ready: 'Ready', not_selected: 'Not selected', api_unavailable: 'API disconnected' }
@@ -470,6 +509,7 @@
             systemInfo: { cuda: false, gpu: '--', ffmpeg: false, ram: 0 },
             preview: { loading: false, error: '', image: '', detections: [], prompt: '', source: '', generatedText: '', predictionsRaw: [], parsed: null },
             compare: { before: null, after: null, status: 'waiting', outputPath: '', speed: 1, timeline: 0, playing: false, liveFrame: null },
+            processPreview: { visible: false, beforeSrc: '', afterSrc: '', beforeName: '-', afterName: '-', status: '' },
             florenceTest: {
                 modelId: '/home/h3c/cbh_ws/florence_train/fused_model',
                 adapterDir: '',
@@ -797,7 +837,10 @@
                 'previewModal', 'closePreview', 'closePreviewFooter', 'previewLoading',
                 'previewError', 'previewImage', 'previewPrompt', 'previewCount',
                 'previewSource', 'previewDetections', 'previewGeneratedText',
-                'previewRawPredictions', 'rerunPreview'
+                'previewRawPredictions', 'rerunPreview', 'processModal',
+                'closeProcessModal', 'closeProcessModalFooter', 'processBeforeName',
+                'processAfterName', 'processBeforeImage', 'processAfterImage',
+                'processBeforeEmpty', 'processAfterEmpty', 'processModalStatus'
             ].forEach(id => {
                 dom[id] = document.getElementById(id);
             });
@@ -926,6 +969,11 @@
             dom.previewModal.addEventListener('click', event => {
                 if (event.target === dom.previewModal) hidePreviewDialog();
             });
+            dom.closeProcessModal.addEventListener('click', hideProcessDialog);
+            dom.closeProcessModalFooter.addEventListener('click', hideProcessDialog);
+            dom.processModal.addEventListener('click', event => {
+                if (event.target === dom.processModal) hideProcessDialog();
+            });
             dom.clearLogs.addEventListener('click', () => {
                 appState.logs = [];
                 renderLogPanel();
@@ -1023,6 +1071,8 @@
             appState.compare.status = 'processing';
             appState.compare.outputPath = '';
             appState.compare.liveFrame = null;
+            resetProcessPreview();
+            showProcessDialog();
             appendLogLine(text('logs.starting'), 'info');
             appendLogLine(text('logs.first_run_hint'), 'muted');
             beginStatusTicker();
@@ -1030,6 +1080,7 @@
 
             try {
                 await loadSourceMedia();
+                updateProcessPreviewFromMedia('before', appState.compare.before, text('compare.before'));
                 if (pathIsVideo(appState.inputPath)) {
                     appState.compare.after = null;
                     appState.compare.status = 'processing';
@@ -1064,12 +1115,14 @@
                 if (result && result.error) {
                     appendLogLine(result.error, 'error');
                     appState.processing = false;
+                    appState.processPreview.status = result.error;
                     endStatusTicker();
                     renderApp();
                 }
             } catch (error) {
                 appendLogLine(error.message, 'error');
                 appState.processing = false;
+                appState.processPreview.status = error.message;
                 endStatusTicker();
                 renderApp();
             }
@@ -1165,6 +1218,16 @@
             toggleHidden(dom.previewModal, true);
         }
 
+        function showProcessDialog() {
+            appState.processPreview.visible = true;
+            renderProcessDialog();
+        }
+
+        function hideProcessDialog() {
+            appState.processPreview.visible = false;
+            renderProcessDialog();
+        }
+
         function beginStatusTicker() {
             endStatusTicker();
             appState.statusTimer = setInterval(() => {
@@ -1239,6 +1302,7 @@
             renderProgressState();
             renderSystemState();
             renderPreviewDialog();
+            renderProcessDialog();
         }
 
         function renderSourceSummary() {
@@ -1341,6 +1405,17 @@
             return `${media.frame_url_template.replace('{frame}', String(frameIndex))}${version}`;
         }
 
+        function imageOnlySource(media) {
+            if (!media) return '';
+            if (media.kind === 'image') return mediaSourceUrl(media);
+            if (media.kind === 'video') {
+                return media.poster_data_url
+                    || (media.poster_data ? `data:${media.poster_mime || 'image/jpeg'};base64,${media.poster_data}` : '')
+                    || frameSourceUrl(media);
+            }
+            return '';
+        }
+
         function hasFrameComparison() {
             return supportsFramePlayback(appState.compare.before) && supportsFramePlayback(appState.compare.after);
         }
@@ -1350,6 +1425,51 @@
                 cancelAnimationFrame(framePlaybackRequest);
                 framePlaybackRequest = null;
             }
+        }
+
+        function resetProcessPreview() {
+            appState.processPreview.beforeSrc = '';
+            appState.processPreview.afterSrc = '';
+            appState.processPreview.beforeName = '-';
+            appState.processPreview.afterName = '-';
+            appState.processPreview.status = text('process_modal.waiting');
+        }
+
+        function setProcessPreviewSide(side, src, name) {
+            if (!src) return;
+            const key = side === 'before' ? 'before' : 'after';
+            appState.processPreview[`${key}Src`] = src;
+            appState.processPreview[`${key}Name`] = name || text(`compare.${key}`);
+            renderProcessDialog();
+        }
+
+        function updateProcessPreviewFromMedia(side, media, fallbackName) {
+            const src = imageOnlySource(media);
+            const name = media && (media.name || formatPathLabel(media.path)) || fallbackName;
+            setProcessPreviewSide(side, src, name);
+        }
+
+        function renderProcessDialog() {
+            if (!dom.processModal) return;
+            toggleHidden(dom.processModal, !appState.processPreview.visible);
+
+            const beforeSrc = appState.processPreview.beforeSrc;
+            const afterSrc = appState.processPreview.afterSrc;
+            toggleHidden(dom.processBeforeImage, !beforeSrc);
+            toggleHidden(dom.processBeforeEmpty, Boolean(beforeSrc));
+            toggleHidden(dom.processAfterImage, !afterSrc);
+            toggleHidden(dom.processAfterEmpty, Boolean(afterSrc));
+
+            if (beforeSrc && dom.processBeforeImage.src !== beforeSrc) {
+                dom.processBeforeImage.src = beforeSrc;
+            }
+            if (afterSrc && dom.processAfterImage.src !== afterSrc) {
+                dom.processAfterImage.src = afterSrc;
+            }
+
+            dom.processBeforeName.textContent = appState.processPreview.beforeName || '-';
+            dom.processAfterName.textContent = appState.processPreview.afterName || '-';
+            dom.processModalStatus.textContent = appState.processPreview.status || text('process_modal.waiting');
         }
 
         function renderMediaPane(media, imgEl, videoEl, emptyEl) {
@@ -1455,6 +1575,9 @@
                 const media = await slayerApi().fetch_media_payload(appState.inputPath);
                 if (!media.error) {
                     appState.compare.before = media;
+                    if (appState.processPreview.visible) {
+                        updateProcessPreviewFromMedia('before', media, text('compare.before'));
+                    }
                 } else {
                     appendLogLine(media.error, 'warning');
                 }
@@ -1497,6 +1620,7 @@
                         name: text('compare.detecting'),
                         path: result.source || appState.inputPath
                     };
+                    updateProcessPreviewFromMedia('after', appState.compare.after, text('compare.detecting'));
                     appState.compare.status = 'processing';
                 } else if (result.error) {
                     appendLogLine(`${text('logs.preview_failed')} ${result.error}`, 'warning');
@@ -1519,6 +1643,9 @@
             appState.compare.timeline = 0;
             appState.compare.playing = false;
             renderComparisonPane();
+            updateProcessPreviewFromMedia('after', media, text('compare.after'));
+            appState.processPreview.status = text('logs.done');
+            renderProcessDialog();
             applyPlaybackRate();
         }
 
@@ -1548,16 +1675,24 @@
 
             const before = liveFrameMedia(payload.before, payload, 'before');
             const after = liveFrameMedia(payload.after, payload, 'after');
-            if (before) appState.compare.before = before;
-            if (after) appState.compare.after = after;
+            if (before) {
+                appState.compare.before = before;
+                updateProcessPreviewFromMedia('before', before, before.name);
+            }
+            if (after) {
+                appState.compare.after = after;
+                updateProcessPreviewFromMedia('after', after, after.name);
+            }
 
             const isProcessed = payload.phase === 'processed';
             appState.compare.status = isProcessed ? 'frame_processed' : 'frame_detected';
             appState.statusMsg = formatLiveFrameText(isProcessed ? 'compare.live_processed' : 'compare.live_detected', payload);
+            appState.processPreview.status = appState.statusMsg;
 
             if (payload.total_frames) {
                 appState.compare.timeline = Math.max(0, Math.min(1000, Math.round(((payload.frame || 0) / payload.total_frames) * 1000)));
             }
+            renderProcessDialog();
             renderComparisonPane();
             renderProgressState();
         }
@@ -1798,7 +1933,10 @@
                     const media = await slayerApi().fetch_media_payload(path);
                     if (media && media.kind === 'video' && pathIsVideo(appState.inputPath)) {
                         const source = await slayerApi().fetch_media_payload(appState.inputPath);
-                        if (source && !source.error) appState.compare.before = source;
+                        if (source && !source.error) {
+                            appState.compare.before = source;
+                            updateProcessPreviewFromMedia('before', source, text('compare.before'));
+                        }
                     }
                     applyProcessedMedia(media);
                 } catch (error) {
@@ -1812,6 +1950,7 @@
                 appState.progress = 100;
                 appState.compare.status = appState.compare.outputPath ? 'done' : 'waiting';
                 appState.statusMsg = text('logs.done');
+                appState.processPreview.status = text('logs.done');
                 endStatusTicker();
                 appendLogLine(text('logs.done'), 'success');
                 renderApp();
