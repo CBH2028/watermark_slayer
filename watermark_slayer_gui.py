@@ -196,10 +196,28 @@ class SlayerBridge:
                 self.end_headers()
 
             def do_HEAD(self):
-                self._serve_media(send_body=False)
+                parsed = urlparse(self.path)
+                if parsed.path.strip('/').split('/')[0:1] == ['frame']:
+                    self._serve_frame(send_body=False)
+                else:
+                    self._serve_media(send_body=False)
 
             def do_GET(self):
-                self._serve_media(send_body=True)
+                parsed = urlparse(self.path)
+                if parsed.path.strip('/').split('/')[0:1] == ['frame']:
+                    self._serve_frame(send_body=True)
+                else:
+                    self._serve_media(send_body=True)
+
+            def _path_for_token(self, token):
+                media_path = routes.get(token)
+                if not media_path:
+                    return None
+
+                path = Path(media_path)
+                if not path.exists() or not path.is_file():
+                    return None
+                return path
 
             def _serve_media(self, send_body=True):
                 parsed = urlparse(self.path)
@@ -208,13 +226,8 @@ class SlayerBridge:
                     self.send_error(404)
                     return
 
-                media_path = routes.get(parts[1])
-                if not media_path:
-                    self.send_error(404)
-                    return
-
-                path = Path(media_path)
-                if not path.exists() or not path.is_file():
+                path = self._path_for_token(parts[1])
+                if not path:
                     self.send_error(404)
                     return
 
@@ -268,6 +281,63 @@ class SlayerBridge:
                             break
                         remaining -= len(chunk)
 
+            def _serve_frame(self, send_body=True):
+                parsed = urlparse(self.path)
+                parts = parsed.path.strip('/').split('/')
+                if len(parts) < 3 or parts[0] != 'frame':
+                    self.send_error(404)
+                    return
+
+                path = self._path_for_token(parts[1])
+                if not path:
+                    self.send_error(404)
+                    return
+
+                try:
+                    frame_index = int(Path(parts[2]).stem)
+                except ValueError:
+                    self.send_error(400)
+                    return
+
+                try:
+                    import cv2
+
+                    cap = cv2.VideoCapture(str(path))
+                    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
+                    frame_index = max(0, min(frame_index, total_frames - 1))
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
+                    ret, frame = cap.read()
+                    cap.release()
+                    if not ret:
+                        self.send_error(404)
+                        return
+
+                    ok, encoded = cv2.imencode(
+                        '.jpg',
+                        frame,
+                        [int(cv2.IMWRITE_JPEG_QUALITY), 82],
+                    )
+                    if not ok:
+                        self.send_error(500)
+                        return
+                    data = encoded.tobytes()
+                except Exception:
+                    self.send_error(500)
+                    return
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'image/jpeg')
+                self.send_header('Content-Length', str(len(data)))
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Cache-Control', 'no-store')
+                self.end_headers()
+
+                if send_body:
+                    try:
+                        self.wfile.write(data)
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
+
         self._media_server = ThreadingHTTPServer(('127.0.0.1', 0), MediaHandler)
         self._media_server.daemon_threads = True
         self._media_server_port = self._media_server.server_address[1]
@@ -277,8 +347,8 @@ class SlayerBridge:
         )
         self._media_server_thread.start()
 
-    def _media_server_url(self, media_path):
-        """Return a browser-safe local URL for a media file."""
+    def _media_token_for_path(self, media_path):
+        """Return a stable local route token for a media file."""
         self._ensure_media_server()
         resolved = str(Path(media_path).resolve())
         token = self._media_tokens.get(resolved)
@@ -286,9 +356,46 @@ class SlayerBridge:
             token = secrets.token_urlsafe(16)
             self._media_tokens[resolved] = token
             self._media_routes[token] = resolved
+        return token
 
+    def _media_server_url(self, media_path):
+        """Return a browser-safe local URL for a media file."""
+        token = self._media_token_for_path(media_path)
         name = quote(Path(media_path).name)
         return f"http://127.0.0.1:{self._media_server_port}/media/{token}/{name}"
+
+    def _frame_server_url_template(self, media_path):
+        """Return a frame JPEG URL template for codec-independent playback."""
+        token = self._media_token_for_path(media_path)
+        return f"http://127.0.0.1:{self._media_server_port}/frame/{token}/{{frame}}.jpg"
+
+    def _video_metadata_payload(self, media_path):
+        """Return video metadata used by the frame-based player."""
+        try:
+            import cv2
+
+            cap = cv2.VideoCapture(str(media_path))
+            fps = float(cap.get(cv2.CAP_PROP_FPS) or 0)
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+            cap.release()
+
+            return {
+                'fps': fps if fps > 0 else 24,
+                'frame_count': frame_count,
+                'duration': (frame_count / fps) if fps > 0 and frame_count > 0 else 0,
+                'width': width,
+                'height': height,
+                'frame_url_template': self._frame_server_url_template(media_path),
+            }
+        except Exception:
+            return {
+                'fps': 24,
+                'frame_count': 0,
+                'duration': 0,
+                'frame_url_template': self._frame_server_url_template(media_path),
+            }
 
     def _video_poster_payload(self, media_path):
         """Extract a compact first-frame poster for video fallback display."""
@@ -325,10 +432,12 @@ class SlayerBridge:
             return {'error': f'Media path does not exist: {path}'}
 
         suffix = media_path.suffix.lower()
+        stat = media_path.stat()
         payload = {
             'path': normalize_runtime_path(media_path.resolve()),
             'name': media_path.name,
             'suffix': suffix,
+            'mtime_ns': stat.st_mtime_ns,
         }
 
         if suffix in IMAGE_EXTENSIONS:
@@ -357,6 +466,7 @@ class SlayerBridge:
                 'mime': mimetypes.guess_type(str(media_path))[0] or 'video/mp4',
                 'url': self._media_server_url(media_path),
             })
+            payload.update(self._video_metadata_payload(media_path))
             if include_data:
                 payload.update(self._video_poster_payload(media_path))
             return payload
@@ -798,6 +908,7 @@ def launch_gui():
         width=950,
         height=860,
         min_size=(800, 600),
+        maximized=True,
         background_color='#050505'
     )
 

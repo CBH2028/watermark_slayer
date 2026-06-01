@@ -485,6 +485,7 @@
         const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
         const dom = {};
+        let framePlaybackRequest = null;
 
         function slayerApi() {
             return window.pywebview && window.pywebview.api ? window.pywebview.api : null;
@@ -1083,6 +1084,8 @@
                 }
             }
             appState.processing = false;
+            appState.compare.playing = false;
+            stopFramePlayback();
             endStatusTicker();
             appendLogLine(text('logs.stopped'), 'warning');
             renderApp();
@@ -1326,16 +1329,41 @@
             return '';
         }
 
+        function supportsFramePlayback(media) {
+            return Boolean(media && media.kind === 'video' && media.frame_url_template && Number(media.frame_count || 0) > 0);
+        }
+
+        function frameSourceUrl(media) {
+            if (!supportsFramePlayback(media)) return '';
+            const frameCount = Math.max(1, Number(media.frame_count || 1));
+            const frameIndex = Math.max(0, Math.min(frameCount - 1, Math.round((appState.compare.timeline / 1000) * (frameCount - 1))));
+            const version = media.mtime_ns ? `?v=${media.mtime_ns}` : '';
+            return `${media.frame_url_template.replace('{frame}', String(frameIndex))}${version}`;
+        }
+
+        function hasFrameComparison() {
+            return supportsFramePlayback(appState.compare.before) && supportsFramePlayback(appState.compare.after);
+        }
+
+        function stopFramePlayback() {
+            if (framePlaybackRequest) {
+                cancelAnimationFrame(framePlaybackRequest);
+                framePlaybackRequest = null;
+            }
+        }
+
         function renderMediaPane(media, imgEl, videoEl, emptyEl) {
             const src = mediaSourceUrl(media);
             const isImage = media && media.kind === 'image' && src;
             const isVideo = media && media.kind === 'video' && src;
+            const isFrameVideo = supportsFramePlayback(media);
             const posterSrc = isVideo && (media.poster_data_url || (media.poster_data ? `data:${media.poster_mime || 'image/jpeg'};base64,${media.poster_data}` : ''));
             const showPoster = isVideo && posterSrc;
+            const frameSrc = isFrameVideo ? frameSourceUrl(media) : '';
 
-            toggleHidden(imgEl, !(isImage || showPoster));
+            toggleHidden(imgEl, !(isImage || showPoster || frameSrc));
             toggleHidden(videoEl, true);
-            toggleHidden(emptyEl, Boolean(isImage || isVideo || showPoster));
+            toggleHidden(emptyEl, Boolean(isImage || isVideo || showPoster || frameSrc));
 
             if (isImage) {
                 imgEl.onerror = () => {
@@ -1348,6 +1376,20 @@
                 imgEl.onload = () => {
                     imgEl.dataset.loaded = 'ok';
                 };
+            }
+            if (frameSrc) {
+                videoEl.pause();
+                videoEl.removeAttribute('src');
+                videoEl.dataset.src = '';
+                if (imgEl.dataset.src !== frameSrc) {
+                    imgEl.onerror = () => {
+                        if (posterSrc && imgEl.src !== posterSrc) imgEl.src = posterSrc;
+                    };
+                    imgEl.src = frameSrc;
+                    imgEl.dataset.src = frameSrc;
+                    imgEl.dataset.loaded = 'frame';
+                }
+                return;
             }
             if (isVideo && videoEl.dataset.src !== src) {
                 videoEl.pause();
@@ -1469,6 +1511,7 @@
 
         function applyProcessedMedia(media) {
             if (!media || media.error) return;
+            stopFramePlayback();
             media.path = normalizeRuntimePath(media.path || '');
             appState.compare.after = media;
             appState.compare.outputPath = media.path || '';
@@ -1499,6 +1542,8 @@
 
         function applyLiveProcessingFrame(payload) {
             if (!payload) return;
+            stopFramePlayback();
+            appState.compare.playing = false;
             appState.compare.liveFrame = payload;
 
             const before = liveFrameMedia(payload.before, payload, 'before');
@@ -1518,6 +1563,12 @@
         }
 
         function comparisonDuration() {
+            const mediaDurations = [appState.compare.before, appState.compare.after]
+                .filter(item => item && item.kind === 'video')
+                .map(item => Number(item.duration || 0))
+                .filter(value => Number.isFinite(value) && value > 0);
+            if (mediaDurations.length) return Math.min(...mediaDurations);
+
             const before = dom.compareBeforeVideo;
             const after = dom.compareAfterVideo;
             const durations = [before.duration, after.duration].filter(value => Number.isFinite(value) && value > 0);
@@ -1530,7 +1581,60 @@
             dom.compareAfterVideo.playbackRate = speed;
         }
 
+        function startFramePlayback() {
+            stopFramePlayback();
+            appState.compare.playing = true;
+            let previousTime = performance.now();
+
+            const tick = now => {
+                if (!appState.compare.playing || !hasFrameComparison()) {
+                    stopFramePlayback();
+                    appState.compare.playing = false;
+                    renderComparisonPane();
+                    return;
+                }
+
+                const duration = comparisonDuration();
+                if (!duration) {
+                    stopFramePlayback();
+                    appState.compare.playing = false;
+                    renderComparisonPane();
+                    return;
+                }
+
+                const speed = parseFloat(appState.compare.speed) || 1;
+                const elapsed = Math.max(0, now - previousTime) / 1000;
+                previousTime = now;
+                appState.compare.timeline += (elapsed * speed / duration) * 1000;
+
+                if (appState.compare.timeline >= 1000) {
+                    appState.compare.timeline = 1000;
+                    appState.compare.playing = false;
+                    stopFramePlayback();
+                    renderComparisonPane();
+                    return;
+                }
+
+                renderComparisonPane();
+                framePlaybackRequest = requestAnimationFrame(tick);
+            };
+
+            framePlaybackRequest = requestAnimationFrame(tick);
+        }
+
         function togglePlayback() {
+            if (hasFrameComparison()) {
+                if (appState.compare.playing) {
+                    appState.compare.playing = false;
+                    stopFramePlayback();
+                } else {
+                    if (appState.compare.timeline >= 1000) appState.compare.timeline = 0;
+                    startFramePlayback();
+                }
+                renderComparisonPane();
+                return;
+            }
+
             const before = dom.compareBeforeVideo;
             const after = dom.compareAfterVideo;
             if (!(appState.compare.before && appState.compare.after && appState.compare.before.kind === 'video' && appState.compare.after.kind === 'video')) return;
@@ -1552,6 +1656,11 @@
 
         function seekComparison() {
             appState.compare.timeline = parseInt(dom.compareTimeline.value, 10) || 0;
+            if (hasFrameComparison()) {
+                renderComparisonPane();
+                return;
+            }
+
             const duration = comparisonDuration();
             if (!duration) return;
             const targetTime = duration * (appState.compare.timeline / 1000);
@@ -1560,6 +1669,7 @@
         }
 
         function syncPlaybackTimeline() {
+            if (hasFrameComparison()) return;
             const duration = comparisonDuration();
             if (!duration || document.activeElement === dom.compareTimeline) return;
             appState.compare.timeline = Math.round((dom.compareBeforeVideo.currentTime / duration) * 1000);
@@ -1697,6 +1807,8 @@
             };
             window.processingComplete = () => {
                 appState.processing = false;
+                appState.compare.playing = false;
+                stopFramePlayback();
                 appState.progress = 100;
                 appState.compare.status = appState.compare.outputPath ? 'done' : 'waiting';
                 appState.statusMsg = text('logs.done');
