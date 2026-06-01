@@ -1,6 +1,6 @@
 """
-WatermarkRemover-AI GUI - Ohio Edition
-PyWebview frontend with brainrot HTML UI
+Watermark Slayer GUI.
+PyWebview frontend for the local processing workflow.
 """
 
 import logging
@@ -26,7 +26,13 @@ import os
 import json
 import yaml
 import base64
+import mimetypes
+import re
+from io import BytesIO
 from pathlib import Path
+from urllib.parse import unquote, urlparse
+
+from PIL import Image, ImageOps
 
 # Only psutil for system info (lightweight)
 try:
@@ -37,6 +43,56 @@ except ImportError:
 
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui.yml")
+DEFAULT_FLORENCE_MODEL_ID = "/home/h3c/cbh_ws/florence_train/fused_model"
+DEFAULT_FLORENCE_ADAPTER_DIR = ""
+DEFAULT_FLORENCE_MAX_NEW_TOKENS = 256
+DEFAULT_FLORENCE_NUM_BEAMS = 3
+DEFAULT_OUTPUT_PATH = "/home/h3c/cbh_ws/water_marked/outputs"
+IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.bmp'}
+VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm'}
+MEDIA_PREVIEW_MAX_SIDE = 1600
+
+
+def to_ubuntu_path(path):
+    """Normalize user-facing paths to Ubuntu/WSL style slash paths."""
+    if path is None:
+        return ''
+
+    value = str(path).strip()
+    if not value:
+        return ''
+
+    parsed = urlparse(value)
+    if parsed.scheme == 'file':
+        if parsed.netloc and parsed.netloc not in ('localhost', ''):
+            value = f"//{parsed.netloc}{unquote(parsed.path)}"
+        else:
+            value = unquote(parsed.path)
+
+    value = value.replace('\\', '/')
+    drive_match = re.match(r'^/?([A-Za-z]):/(.*)$', value)
+    if drive_match:
+        drive, rest = drive_match.groups()
+        value = f"/mnt/{drive.lower()}/{rest}"
+
+    return value
+
+
+def normalize_path_config(config):
+    """Keep path-like values in ui.yml portable for the Ubuntu runtime."""
+    if not isinstance(config, dict):
+        return config
+
+    normalized = dict(config)
+    for key in (
+        'input_path',
+        'output_path',
+        'florence_model_id',
+        'florence_adapter_dir',
+    ):
+        if key in normalized and normalized[key] is not None:
+            normalized[key] = to_ubuntu_path(normalized[key])
+    return normalized
 
 
 class Api:
@@ -46,13 +102,7 @@ class Api:
         self.window = None
         self.process = None
         self.is_running = False
-        print(f"[DEBUG] CONFIG_FILE path: {CONFIG_FILE}")
-        print(f"[DEBUG] File exists: {os.path.exists(CONFIG_FILE)}")
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r') as f:
-                print(f"[DEBUG] Raw file contents:\n{f.read()}")
         self.config = self._load_config()
-        print(f"[DEBUG] Config loaded at startup: {self.config}")
 
     def set_window(self, window):
         """Set the webview window reference"""
@@ -63,7 +113,7 @@ class Api:
         if os.path.exists(CONFIG_FILE):
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                    return yaml.safe_load(f) or {}
+                    return normalize_path_config(yaml.safe_load(f) or {})
             except Exception:
                 pass
         return {}
@@ -71,6 +121,7 @@ class Api:
     def _save_config(self, config):
         """Save configuration to YAML file"""
         try:
+            config = normalize_path_config(config)
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
                 yaml.dump(config, f, default_flow_style=False)
         except Exception as e:
@@ -82,13 +133,13 @@ class Api:
 
     def get_config(self):
         """Return saved configuration to frontend"""
-        print(f"[DEBUG] get_config called, returning: {self.config}")
+        self.config = normalize_path_config(self.config)
         return self.config
 
     def save_config(self, config):
         """Save configuration from frontend"""
-        self.config = config
-        self._save_config(config)
+        self.config = normalize_path_config(config)
+        self._save_config(self.config)
 
     def browse_file(self):
         """Open file browser dialog"""
@@ -106,7 +157,7 @@ class Api:
             webview.FileDialog.OPEN,
             file_types=file_types
         )
-        return result[0] if result else None
+        return to_ubuntu_path(result[0]) if result else None
 
     def browse_folder(self):
         """Open folder browser dialog"""
@@ -114,7 +165,60 @@ class Api:
             return None
 
         result = self.window.create_file_dialog(webview.FileDialog.FOLDER)
-        return result[0] if result else None
+        return to_ubuntu_path(result[0]) if result else None
+
+    def _media_payload(self, path, include_data=True):
+        """Return a browser-displayable payload for an image or video path."""
+        if not path:
+            return {'error': 'No media path specified'}
+
+        path = to_ubuntu_path(path)
+        media_path = Path(path).expanduser()
+        if not media_path.exists():
+            return {'error': f'Media path does not exist: {path}'}
+
+        suffix = media_path.suffix.lower()
+        payload = {
+            'path': to_ubuntu_path(media_path.resolve()),
+            'name': media_path.name,
+            'suffix': suffix,
+            'url': media_path.resolve().as_uri(),
+        }
+
+        if suffix in IMAGE_EXTENSIONS:
+            mime = 'image/png'
+            payload.update({
+                'kind': 'image',
+                'mime': mime,
+            })
+            if include_data:
+                with Image.open(media_path) as image:
+                    image = ImageOps.exif_transpose(image)
+                    if image.mode not in ("RGB", "RGBA"):
+                        image = image.convert("RGB")
+                    image.thumbnail((MEDIA_PREVIEW_MAX_SIDE, MEDIA_PREVIEW_MAX_SIDE))
+                    buffer = BytesIO()
+                    image.save(buffer, format="PNG")
+                data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                payload['data'] = data
+                payload['data_url'] = f"data:{mime};base64,{data}"
+            return payload
+
+        if suffix in VIDEO_EXTENSIONS:
+            payload.update({
+                'kind': 'video',
+                'mime': mimetypes.guess_type(str(media_path))[0] or 'video/mp4',
+            })
+            return payload
+
+        return {'error': f'Unsupported media type: {path}'}
+
+    def get_media(self, path):
+        """Return image base64 or video file URL for comparison UI."""
+        try:
+            return self._media_payload(path)
+        except Exception as e:
+            return {'error': str(e)}
 
     def _would_overwrite_input(self, input_path, output_path):
         """Check if output would overwrite the input file."""
@@ -231,18 +335,15 @@ class Api:
         if self.is_running:
             return {'error': 'Already running'}
 
-        input_path = settings.get('input', '')
-        output_path = settings.get('output', '')
+        input_path = to_ubuntu_path(settings.get('input', ''))
+        output_path = to_ubuntu_path(settings.get('output', '')) or DEFAULT_OUTPUT_PATH
 
         if not input_path:
             return {'error': 'No input path specified'}
 
         # Use input directory as output if not specified
         if not output_path:
-            if os.path.isfile(input_path):
-                output_path = os.path.dirname(input_path)
-            else:
-                output_path = input_path
+            output_path = DEFAULT_OUTPUT_PATH
 
         # SAFETY: Check if output would overwrite input
         overwrite = settings.get('overwrite', False)
@@ -261,6 +362,18 @@ class Api:
 
         # Get settings
         detection_prompt = settings.get('detection_prompt', 'watermark')
+        detection_classes = settings.get('detection_classes', [])
+        if isinstance(detection_classes, str):
+            detection_classes_arg = detection_classes
+        else:
+            detection_classes_arg = ','.join([str(item).strip() for item in detection_classes if str(item).strip()])
+        detection_output_label = settings.get('detection_output_label', 'watermark')
+        detection_task = settings.get('detection_task', 'auto')
+        florence_model_id = to_ubuntu_path(settings.get('florence_model_id', DEFAULT_FLORENCE_MODEL_ID))
+        florence_adapter_dir = to_ubuntu_path(settings.get('florence_adapter_dir', DEFAULT_FLORENCE_ADAPTER_DIR))
+        florence_max_new_tokens = int(settings.get('florence_max_new_tokens', DEFAULT_FLORENCE_MAX_NEW_TOKENS) or DEFAULT_FLORENCE_MAX_NEW_TOKENS)
+        florence_num_beams = int(settings.get('florence_num_beams', DEFAULT_FLORENCE_NUM_BEAMS) or DEFAULT_FLORENCE_NUM_BEAMS)
+        florence_use_fast_processor = bool(settings.get('florence_use_fast_processor', True))
         detection_skip = settings.get('detection_skip', 1)
         fade_in = settings.get('fade_in', 0)
         fade_out = settings.get('fade_out', 0)
@@ -271,19 +384,28 @@ class Api:
             'output_path': output_path,
             'overwrite': settings.get('overwrite', False),
             'transparent': settings.get('transparent', False),
-            'max_bbox_percent': settings.get('max_bbox', 15),
+            'max_bbox_percent': settings.get('max_bbox', 100),
             'force_format': settings.get('format', 'None'),
             'mode': settings.get('mode', 'single'),
             'detection_prompt': detection_prompt,
+            'detection_group': settings.get('detection_group', 'watermark'),
+            'detection_classes': detection_classes_arg.split(',') if detection_classes_arg else [],
+            'detection_output_label': detection_output_label,
+            'detection_task': detection_task,
+            'florence_model_id': florence_model_id,
+            'florence_adapter_dir': florence_adapter_dir,
+            'florence_max_new_tokens': florence_max_new_tokens,
+            'florence_num_beams': florence_num_beams,
+            'florence_use_fast_processor': florence_use_fast_processor,
             'detection_skip': detection_skip,
             'fade_in': fade_in,
             'fade_out': fade_out,
-            'theme': settings.get('theme', 'brainrot'),
-            'lang': settings.get('lang', 'brainrot')
+            'theme': settings.get('theme', 'dark'),
+            'lang': settings.get('lang', 'zh')
         })
 
         # Build command
-        cmd = [sys.executable, 'remwm.py', input_path, output_path]
+        cmd = [sys.executable, 'watermark_slayer.py', input_path, output_path]
 
         if settings.get('overwrite'):
             cmd.append('--overwrite')
@@ -291,7 +413,7 @@ class Api:
         if settings.get('transparent'):
             cmd.append('--transparent')
 
-        max_bbox = settings.get('max_bbox', 15)
+        max_bbox = settings.get('max_bbox', 100)
         cmd.append(f'--max-bbox-percent={int(max_bbox)}')
 
         format_opt = settings.get('format', 'None')
@@ -300,6 +422,19 @@ class Api:
 
         if detection_prompt and detection_prompt != 'watermark':
             cmd.append(f'--detection-prompt={detection_prompt}')
+
+        if detection_classes_arg:
+            cmd.append(f'--detection-classes={detection_classes_arg}')
+        cmd.append(f'--detection-output-label={detection_output_label or "watermark"}')
+        cmd.append(f'--detection-task={detection_task or "auto"}')
+
+        if florence_model_id:
+            cmd.append(f'--florence-model-id={florence_model_id}')
+        cmd.append(f'--florence-adapter-dir={florence_adapter_dir or ""}')
+        cmd.append(f'--florence-max-new-tokens={florence_max_new_tokens}')
+        cmd.append(f'--florence-num-beams={florence_num_beams}')
+        if not florence_use_fast_processor:
+            cmd.append('--use-slow-processor')
 
         if detection_skip and int(detection_skip) > 1:
             cmd.append(f'--detection-skip={int(detection_skip)}')
@@ -320,19 +455,19 @@ class Api:
         try:
             # Log the CLI command for educational purposes
             cli_display = ' '.join(cmd[1:])  # Skip python executable
-            cli_display = cli_display.replace('remwm.py ', 'python remwm.py \\\n    ')
+            cli_display = cli_display.replace('watermark_slayer.py ', 'python watermark_slayer.py \\\n    ')
             cli_display = cli_display.replace(' --', ' \\\n    --')
-            self._call_js(f'addLog("$ {json.dumps(cli_display)[1:-1]}", "text-neon-cyan")')
+            self._call_js(f'addLog("$ {json.dumps(cli_display)[1:-1]}", "text-info")')
 
             env = os.environ.copy()
             env['PYTHONUNBUFFERED'] = '1'
 
             working_dir = os.path.dirname(os.path.abspath(__file__))
-            script_path = os.path.join(working_dir, 'remwm.py')
+            script_path = os.path.join(working_dir, 'watermark_slayer.py')
 
             # Verify script exists
             if not os.path.exists(script_path):
-                self._call_js(f'addLog("ERROR: remwm.py not found at {json.dumps(script_path)}", "text-error")')
+                self._call_js(f'addLog("ERROR: watermark_slayer.py not found at {json.dumps(script_path)}", "text-error")')
                 self._call_js('processingComplete()')
                 return
 
@@ -363,6 +498,11 @@ class Api:
                     except (ValueError, IndexError):
                         pass
 
+                output_match = re.search(r'output_path:([^,\r\n]+)', line)
+                if output_match:
+                    output_path = to_ubuntu_path(output_match.group(1).strip())
+                    self._call_js(f'processingOutputPath({json.dumps(output_path)})')
+
                 # Send log line to frontend
                 escaped = json.dumps(line)
 
@@ -371,7 +511,7 @@ class Api:
                 elif 'warning' in line.lower():
                     color = 'text-yellow-400'
                 elif 'success' in line.lower() or 'done' in line.lower() or 'saved' in line.lower():
-                    color = 'text-neon-green'
+                    color = 'text-success'
                 else:
                     color = 'text-gray-400'
 
@@ -422,9 +562,21 @@ class Api:
         Preview watermark detection via CLI subprocess.
         Returns image with bounding boxes drawn as base64.
         """
-        input_path = settings.get('input', '')
+        input_path = to_ubuntu_path(settings.get('input', ''))
         detection_prompt = settings.get('detection_prompt', 'watermark')
-        max_bbox = settings.get('max_bbox', 15)
+        detection_classes = settings.get('detection_classes', [])
+        if isinstance(detection_classes, str):
+            detection_classes_arg = detection_classes
+        else:
+            detection_classes_arg = ','.join([str(item).strip() for item in detection_classes if str(item).strip()])
+        detection_output_label = settings.get('detection_output_label', 'watermark')
+        detection_task = settings.get('detection_task', 'auto')
+        florence_model_id = to_ubuntu_path(settings.get('florence_model_id', DEFAULT_FLORENCE_MODEL_ID))
+        florence_adapter_dir = to_ubuntu_path(settings.get('florence_adapter_dir', DEFAULT_FLORENCE_ADAPTER_DIR))
+        florence_max_new_tokens = int(settings.get('florence_max_new_tokens', DEFAULT_FLORENCE_MAX_NEW_TOKENS) or DEFAULT_FLORENCE_MAX_NEW_TOKENS)
+        florence_num_beams = int(settings.get('florence_num_beams', DEFAULT_FLORENCE_NUM_BEAMS) or DEFAULT_FLORENCE_NUM_BEAMS)
+        florence_use_fast_processor = bool(settings.get('florence_use_fast_processor', True))
+        max_bbox = settings.get('max_bbox', 100)
 
         if not input_path:
             return {'error': 'No input path specified'}
@@ -432,11 +584,22 @@ class Api:
         try:
             # Call CLI with --preview flag
             cmd = [
-                sys.executable, 'remwm.py',
+                sys.executable, 'watermark_slayer.py',
                 input_path, '--preview',
                 '--max-bbox-percent', str(int(max_bbox)),
                 '--detection-prompt', detection_prompt
             ]
+            if detection_classes_arg:
+                cmd.extend(['--detection-classes', detection_classes_arg])
+            cmd.extend(['--detection-output-label', detection_output_label or 'watermark'])
+            cmd.extend(['--detection-task', detection_task or 'auto'])
+            if florence_model_id:
+                cmd.extend(['--florence-model-id', florence_model_id])
+            cmd.extend(['--florence-adapter-dir', florence_adapter_dir or ''])
+            cmd.extend(['--florence-max-new-tokens', str(florence_max_new_tokens)])
+            cmd.extend(['--florence-num-beams', str(florence_num_beams)])
+            if not florence_use_fast_processor:
+                cmd.append('--use-slow-processor')
 
             result = subprocess.run(
                 cmd,
@@ -463,7 +626,6 @@ class Api:
         except Exception as e:
             return {'error': str(e)}
 
-
 def main():
     """Main entry point"""
     api = Api()
@@ -472,7 +634,7 @@ def main():
     ui_path = os.path.join(script_dir, 'ui', 'index.html')
 
     window = webview.create_window(
-        'WatermarkRemover AI - Ohio Edition',
+        'Watermark Slayer',
         ui_path,
         js_api=api,
         width=950,

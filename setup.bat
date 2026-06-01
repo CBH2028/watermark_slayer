@@ -1,11 +1,11 @@
 @echo off
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
-title WatermarkRemover-AI Setup
+title Watermark Slayer Setup
 
 echo.
 echo   =============================================
-echo      WatermarkRemover-AI Setup (Windows)
+echo      Watermark Slayer Setup (Windows)
 echo   =============================================
 echo.
 
@@ -219,8 +219,8 @@ echo.
 set /p LAUNCH="  Launch now? (y/n): "
 if /i "%LAUNCH%"=="y" (
     echo.
-    echo   Starting WatermarkRemover-AI...
-    start "" "%PYTHON_EXE%" remwmgui.py
+    echo   Starting Watermark Slayer...
+    start "" "%PYTHON_EXE%" watermark_slayer_gui.py
 )
 
 echo.

@@ -1,5 +1,5 @@
-# WatermarkRemover-AI Setup Script
-$Host.UI.RawUI.WindowTitle = "WatermarkRemover-AI Setup"
+# Watermark Slayer Setup Script
+$Host.UI.RawUI.WindowTitle = "Watermark Slayer Setup"
 
 $PYTHON_VERSION = "3.12.7"
 $PYTHON_DIR = "python"
@@ -35,7 +35,7 @@ $tips = @(
 
 Write-Host ""
 Write-Host "  =============================================" -ForegroundColor Cyan
-Write-Host "     WatermarkRemover-AI Setup                 " -ForegroundColor Cyan
+Write-Host "     Watermark Slayer Setup                 " -ForegroundColor Cyan
 Write-Host "  =============================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -344,8 +344,8 @@ Write-Host ""
 $launch = Read-Host "  Launch now? (y/n)"
 if ($launch -eq "y" -or $launch -eq "Y") {
     Write-Host ""
-    Write-Host "  Starting WatermarkRemover-AI..." -ForegroundColor Green
-    Start-Process -FilePath $PYTHON_EXE -ArgumentList "remwmgui.py" -NoNewWindow
+    Write-Host "  Starting Watermark Slayer..." -ForegroundColor Green
+    Start-Process -FilePath $PYTHON_EXE -ArgumentList "watermark_slayer_gui.py" -NoNewWindow
 }
 
 Write-Host ""

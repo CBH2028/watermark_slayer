@@ -8,6 +8,9 @@ python/
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Accidental shell redirection artifacts from unquoted package specs
+=*
 *.so
 .Python
 build/

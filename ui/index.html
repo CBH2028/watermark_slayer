@@ -1,991 +1,1653 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WM REMOVER - OHIO EDITION</title>
-
-    <!-- Tailwind + Alpine + Fonts -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
-    <!-- Base fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Rubik+Glitch&family=Inter:wght@400;800;900&display=swap" rel="stylesheet">
-    <!-- Theme fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Dancing+Script:wght@700&family=Oswald:wght@400;700&family=Playfair+Display:ital,wght@0,400;1,400&family=Mali:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        mono: ['"Space Mono"', 'monospace'],
-                        glitch: ['"Rubik Glitch"', 'cursive'],
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        'void': '#050505',
-                        'card': '#111116',
-                        'neon-green': '#00ff88',
-                        'neon-pink': '#ff006e',
-                        'neon-cyan': '#00f3ff',
-                        'error': '#ff3333',
-                    },
-                    animation: {
-                        'pulse-fast': 'pulse 0.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'glitch': 'glitch 1s linear infinite',
-                        'marquee': 'marquee 10s linear infinite',
-                    },
-                    keyframes: {
-                        glitch: {
-                            '2%, 64%': { transform: 'translate(2px,0) skew(0deg)' },
-                            '4%, 60%': { transform: 'translate(-2px,0) skew(0deg)' },
-                            '62%': { transform: 'translate(0,0) skew(5deg)' },
-                        },
-                        marquee: {
-                            '0%': { transform: 'translateX(0)' },
-                            '100%': { transform: 'translateX(-50%)' },
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body { background-color: #050505; color: white; }
-
-        /* CRT Scanline Effect */
-        .crt::before {
-            content: " ";
-            display: block;
-            position: absolute;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            z-index: 2;
-            background-size: 100% 2px, 3px 100%;
-            pointer-events: none;
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #111; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #00ff88; }
-
-        .glass-panel {
-            background: rgba(17, 17, 22, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        @keyframes loadingBar {
-            0% { width: 0%; margin-left: 0%; }
-            50% { width: 60%; margin-left: 20%; }
-            100% { width: 0%; margin-left: 100%; }
-        }
-
-        /* Custom Tooltips - Fast & Theme-aware */
-        [data-tooltip] {
-            position: relative;
-        }
-        [data-tooltip]::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 0;
-            transform: translateY(-4px);
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: normal;
-            line-height: 1.4;
-            width: max-content;
-            max-width: 220px;
-            text-align: left;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.15s ease, visibility 0.15s ease;
-            pointer-events: none;
-            /* Default theme (brainrot) */
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #00ff88;
-            border: 1px solid #00ff88;
-            box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
-        }
-        [data-tooltip]:hover::after {
-            opacity: 1;
-            visibility: visible;
-        }
-        /* Hide empty tooltips */
-        [data-tooltip=""]::after {
-            display: none;
-        }
-    </style>
-    <!-- Theme styles -->
+    <title>Watermark Slayer</title>
     <link rel="stylesheet" href="themes.css">
 </head>
-<body class="h-screen w-screen flex crt selection:bg-neon-pink selection:text-white overflow-hidden"
-      x-data="brainrotApp()" x-init="init()">
-
-    <!-- LOADING OVERLAY -->
-    <div x-show="isLoading" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-         class="fixed inset-0 z-50 bg-void flex items-center justify-center">
-        <div class="text-center">
-            <div class="text-5xl font-glitch text-transparent bg-clip-text bg-gradient-to-r from-neon-green to-neon-cyan mb-6 animate-pulse">
-                LOADING
-            </div>
-            <div class="w-48 h-1.5 bg-gray-800 rounded-full overflow-hidden mx-auto">
-                <div class="h-full bg-gradient-to-r from-neon-green via-neon-cyan to-neon-pink rounded-full"
-                     style="animation: loadingBar 1.5s ease-in-out infinite"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- BACKGROUND CHAOS -->
-    <div class="fixed inset-0 z-0 opacity-30 pointer-events-none">
-        <div class="absolute top-10 left-10 text-9xl animate-pulse text-neon-green">💀</div>
-        <div class="absolute bottom-20 right-10 text-8xl animate-bounce text-neon-pink">🔥</div>
-        <div class="absolute top-1/2 left-1/4 w-96 h-96 bg-neon-cyan blur-[150px] rounded-full mix-blend-screen opacity-30"></div>
-    </div>
-
-    <!-- MAIN UI CONTAINER - fills entire window -->
-    <main class="relative z-10 w-full h-full flex flex-col md:flex-row overflow-hidden">
-
-        <!-- LEFT SIDEBAR (Controls) -->
-        <aside class="w-96 flex-shrink-0 bg-black/60 backdrop-blur-md border-r border-white/10 p-4 flex flex-col gap-4 overflow-y-auto">
-
-            <!-- HEADER + THEME/LANG SELECTORS -->
-            <div class="flex items-start justify-between gap-2">
-                <!-- Logo -->
-                <div class="space-y-1">
-                    <h1 class="text-4xl font-glitch text-transparent bg-clip-text bg-gradient-to-r from-neon-green to-neon-cyan leading-none filter drop-shadow-[2px_2px_0px_rgba(255,0,255,0.5)]">
-                        WM<br>REMOVER
-                    </h1>
-                    <p class="text-[10px] font-mono text-gray-500 tracking-widest uppercase" x-text="'v' + appVersion"></p>
+<body data-theme="dark">
+    <div id="app" class="app-shell">
+        <aside class="sidebar" aria-label="Controls">
+            <header class="brand">
+                <div class="brand-mark" aria-hidden="true">WM</div>
+                <div class="brand-copy">
+                    <h1 data-i18n="app.title">Watermark Slayer</h1>
+                    <p data-i18n="app.subtitle">Local AI watermark detection and inpainting</p>
+                    <span id="appVersion" class="version">v1.0</span>
                 </div>
-                <!-- Theme & Language Selectors -->
-                <div class="flex flex-col gap-1">
-                    <select x-show="availableThemes.length > 0" x-model="theme" @change="switchTheme(theme); saveConfigDebounced()" class="bg-black/50 border border-white/20 text-white text-[10px] rounded-lg px-2 py-1 focus:border-neon-pink outline-none font-mono">
-                        <template x-for="th in availableThemes" :key="th.id">
-                            <option :value="th.id" :selected="th.id === theme" x-text="th.name || th.id"></option>
-                        </template>
-                    </select>
-                    <!-- Language selector -->
-                    <select x-show="availableLanguages.length > 0" x-model="lang" @change="switchLang(lang); saveConfigDebounced()" class="bg-black/50 border border-white/20 text-white text-[10px] rounded-lg px-2 py-1 focus:border-neon-cyan outline-none font-mono">
-                        <template x-for="ln in availableLanguages" :key="ln.id">
-                            <option :value="ln.id" :selected="ln.id === lang" x-text="(ln.icon ? ln.icon + ' ' : '') + (ln.name || ln.id)"></option>
-                        </template>
-                    </select>
+            </header>
+
+            <section class="control-block">
+                <div class="control-grid two">
+                    <label class="field">
+                        <span data-i18n="labels.theme">Theme</span>
+                        <select id="themeSelect"></select>
+                    </label>
+                    <label class="field">
+                        <span data-i18n="labels.language">Language</span>
+                        <select id="langSelect"></select>
+                    </label>
                 </div>
-            </div>
+            </section>
 
-            <!-- MODE SELECTOR -->
-            <div class="space-y-2">
-                <label class="text-xs font-bold text-neon-green uppercase tracking-wider" x-text="t.modes?.label || 'Mode'"></label>
-                <div class="grid grid-cols-2 gap-2">
-                    <button @click="mode='single'; saveConfigDebounced()" :data-tooltip="t.modes?.single_tooltip || ''" :class="mode=='single' ? 'bg-neon-green text-black shadow-[0_0_15px_#00ff88]' : 'bg-white/5 hover:bg-white/10 text-gray-400'" class="p-3 rounded-xl font-black text-sm transition-all border border-white/10" x-text="t.modes?.single || 'Single'">
-                    </button>
-                    <button @click="mode='batch'; saveConfigDebounced()" :data-tooltip="t.modes?.batch_tooltip || ''" :class="mode=='batch' ? 'bg-neon-cyan text-black shadow-[0_0_15px_#00f3ff]' : 'bg-white/5 hover:bg-white/10 text-gray-400'" class="p-3 rounded-xl font-black text-sm transition-all border border-white/10" x-text="t.modes?.batch || 'Batch'">
-                    </button>
+            <section class="control-block">
+                <div class="section-title" data-i18n="modes.label">Mode</div>
+                <div class="segmented" role="group" aria-label="Mode">
+                    <button id="modeSingle" type="button" class="segment active" data-mode="single" data-i18n="modes.single">Single File</button>
+                    <button id="modeBatch" type="button" class="segment" data-mode="batch" data-i18n="modes.batch">Batch</button>
                 </div>
-            </div>
+            </section>
 
-            <!-- SETTINGS -->
-            <div class="space-y-4 flex-1">
-
-                <!-- Toggle -->
-                <div class="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5">
-                    <span class="text-xs font-bold text-gray-300 cursor-help" :data-tooltip="t.settings?.gaslight?.tooltip || ''"><span x-text="t.settings?.gaslight?.label || 'Overwrite'"></span> <br><span class="text-[10px] text-gray-500 font-mono" x-text="t.settings?.gaslight?.sublabel || ''"></span></span>
-                    <button @click="overwrite = !overwrite; saveConfigDebounced()" class="w-12 h-6 rounded-full relative transition-colors duration-300" :class="overwrite ? 'bg-neon-pink' : 'bg-gray-700'">
-                        <div class="w-4 h-4 bg-white rounded-full absolute top-1 transition-all duration-300" :class="overwrite ? 'left-7' : 'left-1'"></div>
-                    </button>
-                </div>
-
-                <!-- Toggle -->
-                <div class="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5">
-                    <span class="text-xs font-bold text-gray-300 cursor-help" :data-tooltip="t.settings?.ghost?.tooltip || ''"><span x-text="t.settings?.ghost?.label || 'Transparent'"></span> <br><span class="text-[10px] text-gray-500 font-mono" x-text="t.settings?.ghost?.sublabel || ''"></span></span>
-                    <button @click="transparent = !transparent; saveConfigDebounced()" class="w-12 h-6 rounded-full relative transition-colors duration-300" :class="transparent ? 'bg-neon-green' : 'bg-gray-700'">
-                        <div class="w-4 h-4 bg-white rounded-full absolute top-1 transition-all duration-300" :class="transparent ? 'left-7' : 'left-1'"></div>
-                    </button>
-                </div>
-
-                <!-- Slider -->
-                <div class="space-y-2 pt-2">
-                    <div class="flex justify-between text-xs font-mono">
-                        <span class="text-neon-cyan cursor-help" :data-tooltip="t.settings?.sigma_detect?.tooltip || ''" x-text="t.settings?.sigma_detect?.label || 'Max Size'"></span>
-                        <span x-text="detection + '%'">10%</span>
+            <section class="control-block">
+                <div class="section-title" data-i18n="sections.input">Input</div>
+                <label class="field">
+                    <span data-i18n="labels.input_path">Input path</span>
+                    <div class="path-row">
+                        <input id="inputPath" type="text" spellcheck="false" autocomplete="off">
+                        <button id="browseInput" class="icon-button" type="button" title="Browse" aria-label="Browse input">...</button>
                     </div>
-                    <input type="range" min="1" max="100" x-model="detection" @change="saveConfigDebounced()" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-neon-cyan">
-                </div>
+                </label>
+                <label class="field">
+                    <span data-i18n="labels.output_path">Output path</span>
+                    <div class="path-row">
+                        <input id="outputPath" type="text" spellcheck="false" autocomplete="off" data-i18n-placeholder="output.placeholder">
+                        <button id="browseOutput" class="icon-button" type="button" title="Browse" aria-label="Browse output">...</button>
+                    </div>
+                </label>
+            </section>
 
-                <!-- Detection Prompt -->
-                <div class="space-y-1">
-                    <label class="text-[10px] text-gray-500 uppercase cursor-help" :data-tooltip="t.settings?.detection_prompt?.tooltip || ''" x-text="t.settings?.detection_prompt?.label || 'Detection Prompt'"></label>
-                    <input type="text" x-model="detectionPrompt" list="prompt-suggestions" @change="saveConfigDebounced()"
-                           :placeholder="t.settings?.detection_prompt?.placeholder || 'watermark'"
-                           class="w-full bg-black border border-white/20 text-white text-sm rounded-lg p-2.5 focus:border-neon-cyan outline-none font-mono">
-                    <datalist id="prompt-suggestions">
-                        <option value="watermark">
-                        <option value="watermark logo">
-                        <option value="watermark Sora logo">
-                        <option value="watermark text">
-                        <option value="Getty Images">
-                        <option value="Shutterstock">
-                        <option value="Adobe Stock">
-                        <option value="iStock">
+            <section class="control-block">
+                <div class="section-title" data-i18n="sections.settings">Processing</div>
+                <label class="switch-row" data-tooltip-key="settings.gaslight.tooltip">
+                    <span>
+                        <strong data-i18n="settings.gaslight.label">Overwrite output</strong>
+                        <small data-i18n="settings.gaslight.sublabel"></small>
+                    </span>
+                    <input id="overwriteToggle" type="checkbox">
+                </label>
+                <label class="switch-row" data-tooltip-key="settings.ghost.tooltip">
+                    <span>
+                        <strong data-i18n="settings.ghost.label">Transparent mode</strong>
+                        <small data-i18n="settings.ghost.sublabel">Images only</small>
+                    </span>
+                    <input id="transparentToggle" type="checkbox">
+                </label>
+
+                <label class="field range-field" data-tooltip-key="settings.sigma_detect.tooltip">
+                    <span class="range-label">
+                        <span data-i18n="settings.sigma_detect.label">Max detection area</span>
+                        <b id="detectionValue">100%</b>
+                    </span>
+                    <input id="detectionRange" type="range" min="1" max="100" value="100">
+                </label>
+
+                <label class="field" data-tooltip-key="settings.detection_prompt.tooltip">
+                    <span data-i18n="classes.fallback_prompt">Fallback prompt</span>
+                    <input id="detectionPrompt" type="text" list="promptOptions" data-i18n-placeholder="settings.detection_prompt.placeholder">
+                    <datalist id="promptOptions">
+                        <option value="watermark"></option>
+                        <option value="logo"></option>
+                        <option value="text"></option>
+                        <option value="signature"></option>
                     </datalist>
-                </div>
+                </label>
 
-                <!-- PREVIEW BUTTON -->
-                <button @click="runPreview()" :disabled="!inputPath || previewLoading"
-                        :data-tooltip="t.buttons?.preview_tooltip || ''"
-                        class="w-full py-3 bg-neon-cyan/20 hover:bg-neon-cyan/40 text-neon-cyan border border-neon-cyan/50 rounded-xl font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        :class="previewLoading ? 'animate-pulse' : ''">
-                    <span x-text="previewLoading ? (t.buttons?.preview_loading || '🔄 Detecting...') : (t.buttons?.preview || '🔍 Preview')"></span>
-                </button>
-
-                <!-- Video Settings Section (only for video files) -->
-                <div x-show="isVideoFile(inputPath)" x-transition
-                     class="space-y-3 p-3 bg-purple-900/20 rounded-xl border border-purple-500/30">
-                    <div class="text-xs font-bold text-purple-400 uppercase flex items-center gap-2">
-                        <span>🎬</span> <span x-text="t.video_settings?.title || 'Video Settings'"></span>
+                <div class="class-map">
+                    <label class="field">
+                        <span data-i18n="classes.group">Unified category</span>
+                        <select id="classGroupSelect"></select>
+                    </label>
+                    <div id="classGroupDescription" class="class-description"></div>
+                    <div class="class-output">
+                        <span data-i18n="classes.output_label">Output label</span>
+                        <strong id="classOutputLabel">watermark</strong>
                     </div>
-
-                    <!-- Detection Skip Slider -->
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs font-mono">
-                            <span class="text-purple-300" x-text="t.video_settings?.detection_skip?.label || 'Detection Skip'"></span>
-                            <span x-text="detectionSkip + ' ' + (t.video_settings?.detection_skip?.unit || 'frames')"></span>
-                        </div>
-                        <input type="range" min="1" max="10" x-model="detectionSkip" @change="saveConfigDebounced()"
-                               class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500">
-                        <div class="text-[9px] text-gray-500" x-text="t.video_settings?.detection_skip?.hint || ''"></div>
-                    </div>
-
-                    <!-- Fade In Slider -->
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs font-mono">
-                            <span class="text-purple-300" x-text="t.video_settings?.fade_in?.label || 'Fade In'"></span>
-                            <span x-text="fadeIn + 's'"></span>
-                        </div>
-                        <input type="range" min="0" max="2" step="0.1" x-model="fadeIn" @change="saveConfigDebounced()"
-                               class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500">
-                        <div class="text-[9px] text-gray-500" x-text="t.video_settings?.fade_in?.hint || ''"></div>
-                    </div>
-
-                    <!-- Fade Out Slider -->
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs font-mono">
-                            <span class="text-purple-300" x-text="t.video_settings?.fade_out?.label || 'Fade Out'"></span>
-                            <span x-text="fadeOut + 's'"></span>
-                        </div>
-                        <input type="range" min="0" max="2" step="0.1" x-model="fadeOut" @change="saveConfigDebounced()"
-                               class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500">
-                        <div class="text-[9px] text-gray-500" x-text="t.video_settings?.fade_out?.hint || ''"></div>
+                    <div class="field">
+                        <span data-i18n="classes.raw_classes">Raw model classes</span>
+                        <div id="classCheckboxes" class="class-checkboxes"></div>
+                        <small data-i18n="classes.hint">Selected raw classes are merged into one output label for mask generation.</small>
                     </div>
                 </div>
 
-                <!-- Format Dropdown -->
-                <div class="space-y-1">
-                    <label class="text-[10px] text-gray-500 uppercase cursor-help" :data-tooltip="t.settings?.output_format?.tooltip || ''" x-text="t.settings?.output_format?.label || 'Output Format'"></label>
-                    <select x-model="format" @change="saveConfigDebounced()" class="w-full bg-black border border-white/20 text-white text-sm rounded-lg p-2.5 focus:border-neon-green outline-none font-mono">
-                        <option value="None" x-text="t.settings?.output_format?.auto || 'Auto'"></option>
-                        <option value="PNG" x-text="t.settings?.output_format?.png || 'PNG'"></option>
-                        <option value="JPG" x-text="t.settings?.output_format?.jpg || 'JPG'"></option>
-                        <option value="WEBP" x-text="t.settings?.output_format?.webp || 'WEBP'"></option>
-                        <option value="MP4" x-text="t.settings?.output_format?.mp4 || 'MP4'"></option>
-                        <option value="AVI" x-text="t.settings?.output_format?.avi || 'AVI'"></option>
+                <div class="model-map">
+                    <div class="section-title" data-i18n="model_settings.title">Florence Model</div>
+                    <label class="field">
+                        <span data-i18n="model_settings.model_id">Model folder</span>
+                        <div class="path-row">
+                            <input id="florenceModelId" type="text" spellcheck="false">
+                            <button id="browseFlorenceModel" class="icon-button" type="button" title="Browse">...</button>
+                        </div>
+                    </label>
+                    <label class="field">
+                        <span data-i18n="model_settings.adapter_dir">Adapter folder</span>
+                        <div class="path-row">
+                            <input id="florenceAdapterDir" type="text" spellcheck="false">
+                            <button id="browseFlorenceAdapter" class="icon-button" type="button" title="Browse">...</button>
+                        </div>
+                    </label>
+                    <div class="control-grid two">
+                        <label class="field">
+                            <span data-i18n="model_settings.max_new_tokens">Max tokens</span>
+                            <input id="florenceMaxTokens" type="number" min="1" max="1024">
+                        </label>
+                        <label class="field">
+                            <span data-i18n="model_settings.num_beams">Beams</span>
+                            <input id="florenceNumBeams" type="number" min="1" max="10">
+                        </label>
+                    </div>
+                    <label class="switch-row compact-switch">
+                        <span>
+                            <strong data-i18n="model_settings.use_fast_processor">Fast processor</strong>
+                        </span>
+                        <input id="florenceUseFastProcessor" type="checkbox">
+                    </label>
+                </div>
+
+                <label class="field" data-tooltip-key="settings.output_format.tooltip">
+                    <span data-i18n="settings.output_format.label">Output format</span>
+                    <select id="formatSelect">
+                        <option value="None" data-i18n="settings.output_format.auto">Auto</option>
+                        <option value="PNG" data-i18n="settings.output_format.png">PNG</option>
+                        <option value="JPG" data-i18n="settings.output_format.jpg">JPG</option>
+                        <option value="WEBP" data-i18n="settings.output_format.webp">WEBP</option>
+                        <option value="MP4" data-i18n="settings.output_format.mp4">MP4</option>
+                        <option value="AVI" data-i18n="settings.output_format.avi">AVI</option>
                     </select>
-                </div>
-            </div>
+                </label>
+            </section>
 
-            <!-- START BUTTON -->
-            <button @click="startProcessing()" :disabled="processing || !inputPath"
-                class="relative group w-full py-5 bg-neon-green rounded-xl font-black text-black text-xl overflow-hidden hover:scale-[1.02] active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">
-                <span class="relative z-10 flex items-center justify-center gap-2" x-text="processing ? (t.buttons?.start_processing || 'Processing...') : (t.buttons?.start || 'Start')">
-                </span>
-                <!-- Button Glow -->
-                <div class="absolute inset-0 bg-white/30 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-            </button>
+            <section id="videoPanel" class="control-block">
+                <div class="section-title" data-i18n="video_settings.title">Video Settings</div>
+                <label class="field range-field">
+                    <span class="range-label">
+                        <span data-i18n="video_settings.detection_skip.label">Detection interval</span>
+                        <b><span id="detectionSkipValue">1</span> <span data-i18n="video_settings.detection_skip.unit">frames</span></b>
+                    </span>
+                    <input id="detectionSkip" type="range" min="1" max="10" value="1">
+                    <small data-i18n="video_settings.detection_skip.hint"></small>
+                </label>
+                <label class="field range-field">
+                    <span class="range-label">
+                        <span data-i18n="video_settings.fade_in.label">Lead buffer</span>
+                        <b><span id="fadeInValue">0</span>s</b>
+                    </span>
+                    <input id="fadeIn" type="range" min="0" max="2" step="0.1" value="0">
+                    <small data-i18n="video_settings.fade_in.hint"></small>
+                </label>
+                <label class="field range-field">
+                    <span class="range-label">
+                        <span data-i18n="video_settings.fade_out.label">Tail buffer</span>
+                        <b><span id="fadeOutValue">0</span>s</b>
+                    </span>
+                    <input id="fadeOut" type="range" min="0" max="2" step="0.1" value="0">
+                    <small data-i18n="video_settings.fade_out.hint"></small>
+                </label>
+            </section>
 
+            <section class="control-block actions">
+                <button id="startButton" type="button" class="primary-button" data-i18n="buttons.start">Start Processing</button>
+                <button id="stopButton" type="button" class="secondary-button" data-i18n="buttons.stop">Stop</button>
+                <button id="previewButton" type="button" class="secondary-button" data-i18n="buttons.preview">Preview Detection</button>
+            </section>
         </aside>
 
-        <!-- RIGHT CONTENT (Preview & Logs) -->
-        <div class="flex-1 min-w-[400px] flex flex-col relative bg-black/40 backdrop-blur-sm overflow-hidden">
-
-            <!-- MARQUEE BAR -->
-            <div class="bg-neon-pink text-black font-bold text-xs py-1 overflow-hidden whitespace-nowrap border-b border-neon-pink">
-                <div class="animate-marquee inline-block" x-text="(t.marquee || 'WATERMARK REMOVER AI') + ' ' + (t.marquee || '')">
+        <main class="workspace">
+            <section class="hero-panel">
+                <div>
+                    <p class="eyebrow" data-i18n="labels.current_file">Current input</p>
+                    <h2 id="selectedTitle" data-i18n="dropzone.title">Select a file or folder</h2>
+                    <p id="selectedSubtitle" data-i18n="dropzone.subtitle">Images, videos, and batch folders are supported</p>
                 </div>
-            </div>
+                <button id="stageBrowse" type="button" class="primary-button compact" data-i18n="buttons.select_input">Select Input</button>
+            </section>
 
-            <!-- DRAG & DROP ZONE -->
-            <div class="flex-1 p-6 flex flex-col gap-4">
-
-                <!-- Input Box -->
-                <div @click="browseInput()"
-                     class="border-2 border-dashed border-white/20 rounded-2xl flex-1 flex flex-col items-center justify-center p-8 transition-all hover:border-neon-green hover:bg-neon-green/5 group cursor-pointer relative overflow-hidden">
-                    <template x-if="!inputPath">
-                        <div class="text-center">
-                            <div class="text-5xl mb-4 group-hover:animate-bounce">📥</div>
-                            <h3 class="text-xl font-bold text-white group-hover:text-neon-green" x-text="t.dropzone?.title || 'Drop Files Here'"></h3>
-                            <p class="text-sm text-gray-500 mt-2 font-mono" x-text="t.dropzone?.subtitle || 'or click to browse'"></p>
-                        </div>
-                    </template>
-                    <template x-if="inputPath">
-                        <div class="text-center">
-                            <div class="text-5xl mb-4" x-text="isVideoFile(inputPath) ? '🎬' : '✅'"></div>
-                            <h3 class="text-lg font-bold text-neon-green break-all px-4" x-text="inputPath"></h3>
-                            <p class="text-sm text-gray-500 mt-2 font-mono" x-text="isVideoFile(inputPath) ? (t.dropzone?.video_hint || 'video - click to change') : (t.dropzone?.image_hint || 'click to change')"></p>
-                        </div>
-                    </template>
-
-                    <!-- Background Grid Animation -->
-                    <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMCwgMjU1LSAxMzYsIDAuMSkiLz48L3N2Zz4=')] opacity-20"></div>
+            <section id="dropZone" class="drop-zone" tabindex="0">
+                <div class="drop-symbol" aria-hidden="true"></div>
+                <div>
+                    <strong id="pathDisplay" data-i18n="labels.not_selected">Not selected</strong>
+                    <span id="fileKind" data-i18n="labels.ready">Ready</span>
                 </div>
+            </section>
 
-                <!-- Output Path Input -->
-                <div class="flex gap-2">
-                    <div class="flex-1 min-w-0 bg-card border border-white/10 rounded-xl p-3 flex items-center gap-2">
-                        <span class="text-gray-500 flex-shrink-0">📂</span>
-                        <input type="text" x-model="outputPath" @change="saveConfigDebounced()" :placeholder="t.output?.placeholder || 'Output folder...'" class="bg-transparent text-sm text-gray-300 w-full outline-none font-mono truncate">
+            <section class="panel compare-panel">
+                <div class="panel-head">
+                    <div>
+                        <h3 data-i18n="compare.title">Before / After</h3>
+                        <p data-i18n="compare.subtitle">Detection preview and processed output stay side by side.</p>
                     </div>
-                    <button @click="browseOutput()" class="flex-shrink-0 bg-white/10 hover:bg-white/20 text-white px-3 py-3 rounded-xl border border-white/10 transition-colors text-sm" x-text="t.buttons?.browse || 'Browse'"></button>
+                    <span id="compareStatus" data-i18n="compare.waiting">Waiting</span>
                 </div>
 
-            </div>
-
-            <!-- LOGS / TERMINAL AREA -->
-            <div class="h-52 bg-black/70 backdrop-blur-md border-t border-white/10 p-4 font-mono text-xs overflow-y-auto relative select-text cursor-text" id="logs-container">
-                <div class="absolute top-2 right-2 flex gap-2">
-                    <span class="w-3 h-3 rounded-full bg-red-500"></span>
-                    <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
-                    <span class="w-3 h-3 rounded-full bg-green-500"></span>
-                </div>
-
-                <div class="space-y-1">
-                    <template x-for="log in logs" :key="log.id">
-                        <div :class="log.color">
-                            <span class="opacity-50" x-text="'[' + log.time + ']'"></span>
-                            <span x-text="log.msg"></span>
+                <div class="compare-grid">
+                    <div class="compare-pane">
+                        <div class="compare-pane-head">
+                            <h4 data-i18n="compare.before">Before</h4>
+                            <span id="compareBeforeName">-</span>
                         </div>
-                    </template>
-                    <div x-show="processing" class="text-neon-green animate-pulse" x-text="t.logs?.cooking || '_ processing...'"></div>
-                </div>
-            </div>
-
-            <!-- STATUS BAR -->
-            <div class="bg-black/60 backdrop-blur-md border-t border-white/10 p-2 px-4 flex justify-between items-center text-[10px] font-mono text-gray-500 uppercase">
-                <div class="flex gap-4">
-                    <span class="flex items-center gap-1">
-                        <span class="w-2 h-2 rounded-full" :class="systemInfo.cuda ? 'bg-neon-green' : 'bg-red-500'"></span>
-                        <span x-text="t.status_bar?.cuda || 'CUDA'"></span>: <span x-text="systemInfo.cuda ? (t.status_bar?.on || 'ON') : (t.status_bar?.off || 'OFF')"></span>
-                    </span>
-                    <span class="flex items-center gap-1">
-                        <span class="w-2 h-2 rounded-full" :class="systemInfo.ffmpeg ? 'bg-neon-green' : 'bg-yellow-500'"></span>
-                        <span x-text="t.status_bar?.ffmpeg || 'FFmpeg'"></span>: <span x-text="systemInfo.ffmpeg ? (t.status_bar?.on || 'ON') : (t.status_bar?.off || 'OFF')"></span>
-                    </span>
-                    <span><span x-text="t.status_bar?.ram || 'RAM'"></span>: <span x-text="systemInfo.ram + '%'"></span></span>
-                </div>
-                <div x-text="systemInfo.gpu || (t.status_bar?.cpu_mode || 'CPU Mode')"></div>
-            </div>
-
-            <!-- PROGRESS OVERLAY (Visible when processing) -->
-            <div x-show="processing"
-                 x-transition:enter="transition ease-out duration-300"
-                 x-transition:enter-start="opacity-0 backdrop-blur-none"
-                 x-transition:enter-end="opacity-100 backdrop-blur-sm"
-                 class="absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-10">
-
-                <h2 class="text-4xl font-black italic text-white mb-6 animate-pulse" x-text="statusMsg">REMOVING CRINGE...</h2>
-
-                <!-- Custom Progress Bar -->
-                <div class="w-full max-w-md h-8 bg-gray-800 rounded-full border-2 border-white overflow-hidden relative shadow-[0_0_20px_#ff006e]">
-                    <div class="h-full bg-gradient-to-r from-neon-pink via-purple-500 to-neon-cyan transition-all duration-300 relative" :style="'width: ' + progress + '%'">
-                        <!-- Moving Stripe -->
-                        <div class="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.2)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.2)_50%,rgba(255,255,255,0.2)_75%,transparent_75%,transparent)] bg-[length:20px_20px] animate-[marquee_1s_linear_infinite]"></div>
-                    </div>
-                </div>
-
-                <p class="mt-4 text-neon-cyan font-mono text-lg" x-text="progress + '%'"></p>
-
-                <button @click="stopProcessing()" class="mt-8 px-6 py-2 border border-red-500 text-red-500 hover:bg-red-500 hover:text-white rounded-full font-bold transition-all uppercase text-xs tracking-widest" x-text="t.buttons?.stop || 'Stop'">
-                </button>
-            </div>
-
-            <!-- PREVIEW MODAL -->
-            <div x-show="previewMode"
-                 x-transition:enter="transition ease-out duration-200"
-                 x-transition:enter-start="opacity-0"
-                 x-transition:enter-end="opacity-100"
-                 x-transition:leave="transition ease-in duration-150"
-                 x-transition:leave-start="opacity-100"
-                 x-transition:leave-end="opacity-0"
-                 class="absolute inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4"
-                 @click.self="previewMode = false">
-
-                <div class="bg-card border border-white/10 rounded-2xl p-6 max-w-3xl w-full max-h-full overflow-auto shadow-[0_0_50px_rgba(0,243,255,0.2)]">
-                    <!-- Header -->
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-black text-neon-cyan" x-text="t.preview_modal?.title || 'Detection Preview'"></h2>
-                        <button @click="previewMode = false" class="text-gray-500 hover:text-white text-2xl">&times;</button>
-                    </div>
-
-                    <!-- Preview Image -->
-                    <div class="bg-black rounded-xl overflow-hidden mb-4 flex items-center justify-center min-h-[200px]">
-                        <template x-if="previewImage">
-                            <img :src="'data:image/png;base64,' + previewImage" class="max-w-full max-h-[400px] object-contain">
-                        </template>
-                        <template x-if="!previewImage && previewLoading">
-                            <div class="text-center">
-                                <div class="text-gray-500 animate-pulse mb-2" x-text="t.preview_modal?.loading || 'Loading...'"></div>
-                                <div class="text-gray-600 text-xs" x-text="t.preview_modal?.loading_hint || ''"></div>
-                            </div>
-                        </template>
-                        <template x-if="previewError">
-                            <div class="p-4 flex flex-col items-center gap-3 max-w-full">
-                                <div class="text-error text-sm break-all max-h-[150px] overflow-y-auto w-full" x-text="previewError"></div>
-                                <button @click="navigator.clipboard.writeText(previewError); $el.textContent = 'Copied!'; setTimeout(() => $el.textContent = t.buttons?.copy_error || '📋 Copy Error', 1500)"
-                                        class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-gray-300 text-xs rounded-lg border border-white/10 transition-colors" x-text="t.buttons?.copy_error || '📋 Copy Error'">
-                                </button>
-                            </div>
-                        </template>
-                    </div>
-
-                    <!-- Detection Info -->
-                    <div class="grid grid-cols-2 gap-4 text-sm font-mono mb-4">
-                        <div class="bg-white/5 p-3 rounded-lg">
-                            <span class="text-gray-500" x-text="t.preview_modal?.prompt || 'Prompt:'"></span>
-                            <span class="text-neon-cyan ml-2" x-text="previewPromptUsed || '-'"></span>
-                        </div>
-                        <div class="bg-white/5 p-3 rounded-lg">
-                            <span class="text-gray-500" x-text="t.preview_modal?.detected || 'Detected:'"></span>
-                            <span class="text-neon-green ml-2" x-text="previewDetections.length + ' ' + (t.preview_modal?.regions || 'region(s)')"></span>
-                        </div>
-                        <div class="bg-white/5 p-3 rounded-lg col-span-2">
-                            <span class="text-gray-500" x-text="t.preview_modal?.source || 'Source:'"></span>
-                            <span class="text-white ml-2" x-text="previewSource || '-'"></span>
+                        <div class="compare-media">
+                            <img id="compareBeforeImage" class="hidden" alt="Before image">
+                            <video id="compareBeforeVideo" class="hidden" muted playsinline></video>
+                            <div id="compareBeforeEmpty" class="compare-empty" data-i18n="compare.before_empty">Select an image or video.</div>
                         </div>
                     </div>
 
-                    <!-- Detections List -->
-                    <template x-if="previewDetections.length > 0">
-                        <div class="space-y-2 mb-4">
-                            <div class="text-xs text-gray-500 uppercase" x-text="t.preview_modal?.bounding_boxes || 'Bounding Boxes:'"></div>
-                            <template x-for="(det, idx) in previewDetections" :key="idx">
-                                <div class="flex items-center gap-2 text-xs font-mono bg-white/5 p-2 rounded">
-                                    <span class="w-3 h-3 rounded-full" :class="det.accepted ? 'bg-neon-green' : 'bg-error'"></span>
-                                    <span class="text-gray-400" x-text="'#' + (idx + 1)"></span>
-                                    <span class="text-white" x-text="det.area_percent + (t.preview_modal?.of_image || '% of image')"></span>
-                                    <span x-show="!det.accepted" class="text-error" x-text="t.preview_modal?.too_large || '(too large, skip)'"></span>
-                                </div>
-                            </template>
+                    <div class="compare-pane">
+                        <div class="compare-pane-head">
+                            <h4 data-i18n="compare.after">After</h4>
+                            <span id="compareAfterName">-</span>
                         </div>
-                    </template>
-
-                    <!-- Actions -->
-                    <div class="flex gap-3 justify-end">
-                        <button @click="runPreview()" :disabled="previewLoading"
-                                class="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-bold transition-all disabled:opacity-50">
-                            <span x-text="previewLoading ? (t.preview_modal?.loading || 'Loading...') : (t.buttons?.try_again || '🔄 Try Again')"></span>
-                        </button>
-                        <button @click="previewMode = false"
-                                class="px-4 py-2 bg-neon-cyan text-black rounded-lg font-bold hover:bg-neon-cyan/80 transition-all">
-                            <span x-text="t.buttons?.close || 'Close'"></span>
-                        </button>
+                        <div class="compare-media">
+                            <img id="compareAfterImage" class="hidden" alt="After image">
+                            <video id="compareAfterVideo" class="hidden" muted playsinline></video>
+                            <div id="compareAfterEmpty" class="compare-empty" data-i18n="compare.after_empty">Detection boxes or processed output will appear here.</div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
+                <div class="compare-controls">
+                    <button id="comparePlayPause" type="button" class="secondary-button compact" data-i18n="compare.play">Play</button>
+                    <label class="field">
+                        <span data-i18n="compare.progress">Progress</span>
+                        <input id="compareTimeline" type="range" min="0" max="1000" value="0">
+                    </label>
+                    <label class="field speed-field">
+                        <span data-i18n="compare.speed">Speed</span>
+                        <select id="compareSpeed">
+                            <option value="0.25">0.25x</option>
+                            <option value="0.5">0.5x</option>
+                            <option value="1" selected>1x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="2">2x</option>
+                            <option value="4">4x</option>
+                        </select>
+                    </label>
+                </div>
+            </section>
+
+            <section class="status-layout">
+                <div class="panel progress-panel">
+                    <div class="panel-head">
+                        <h3 data-i18n="labels.progress">Progress</h3>
+                        <span id="statusText" data-i18n="labels.idle">Idle</span>
+                    </div>
+                    <div class="progress-track" aria-label="Progress">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <div class="progress-meta">
+                        <span id="progressValue">0%</span>
+                        <span id="statusMessage">Ready</span>
+                    </div>
+                </div>
+
+                <div class="panel system-panel">
+                    <div class="panel-head">
+                        <h3 data-i18n="sections.system">System</h3>
+                    </div>
+                    <div class="system-grid">
+                        <div class="system-item">
+                            <span data-i18n="status_bar.cuda">CUDA</span>
+                            <strong id="cudaState">--</strong>
+                        </div>
+                        <div class="system-item">
+                            <span data-i18n="status_bar.ffmpeg">FFmpeg</span>
+                            <strong id="ffmpegState">--</strong>
+                        </div>
+                        <div class="system-item">
+                            <span data-i18n="status_bar.ram">RAM</span>
+                            <strong id="ramState">--</strong>
+                        </div>
+                        <div class="system-item wide">
+                            <span>Device</span>
+                            <strong id="gpuState">--</strong>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel log-panel">
+                <div class="panel-head">
+                    <h3 data-i18n="sections.logs">Logs</h3>
+                    <button id="clearLogs" type="button" class="text-button">Clear</button>
+                </div>
+                <div id="logs" class="logs" aria-live="polite"></div>
+            </section>
+        </main>
+    </div>
+
+    <div id="previewModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+        <div class="modal-surface">
+            <header class="modal-head">
+                <div>
+                    <p class="eyebrow" data-i18n="sections.preview">Preview</p>
+                    <h2 id="previewTitle" data-i18n="preview_modal.title">Detection Preview</h2>
+                </div>
+                <button id="closePreview" type="button" class="icon-button close" aria-label="Close">x</button>
+            </header>
+            <div id="previewBody" class="preview-body">
+                <div id="previewLoading" class="preview-state hidden">
+                    <div class="loader"></div>
+                    <strong data-i18n="preview_modal.loading">Detecting...</strong>
+                    <span data-i18n="preview_modal.loading_hint">The first run may need to download model files.</span>
+                </div>
+                <div id="previewError" class="preview-error hidden"></div>
+                <img id="previewImage" class="preview-image hidden" alt="Detection preview">
+            </div>
+            <div class="preview-meta">
+                <div>
+                    <span data-i18n="preview_modal.prompt">Prompt:</span>
+                    <strong id="previewPrompt">-</strong>
+                </div>
+                <div>
+                    <span data-i18n="preview_modal.detected">Detected:</span>
+                    <strong><span id="previewCount">0</span> <span data-i18n="preview_modal.regions">region(s)</span></strong>
+                </div>
+                <div class="wide">
+                    <span data-i18n="preview_modal.source">Source:</span>
+                    <strong id="previewSource">-</strong>
+                </div>
+            </div>
+            <div class="preview-list">
+                <h3 data-i18n="preview_modal.bounding_boxes">Bounding Boxes</h3>
+                <div id="previewDetections"></div>
+            </div>
+            <div class="preview-raw test-json-grid">
+                <div>
+                    <h3 data-i18n="preview_modal.generated_text">Florence Generated Text</h3>
+                    <pre id="previewGeneratedText"></pre>
+                </div>
+                <div>
+                    <h3 data-i18n="preview_modal.predictions_raw">Raw OD Predictions</h3>
+                    <pre id="previewRawPredictions"></pre>
+                </div>
+            </div>
+            <footer class="modal-actions">
+                <button id="rerunPreview" type="button" class="secondary-button" data-i18n="buttons.try_again">Run Again</button>
+                <button id="closePreviewFooter" type="button" class="primary-button compact" data-i18n="buttons.close">Close</button>
+            </footer>
         </div>
-    </main>
+    </div>
 
     <script>
-        // Store reference to Alpine app instance for Python callbacks (Alpine 3.x compatible)
-        window.appInstance = null;
+        const fallbackText = {
+            app: { title: 'Watermark Slayer', subtitle: 'Local AI watermark detection and inpainting' },
+            sections: { input: 'Input', output: 'Output', settings: 'Processing', video: 'Video', system: 'System', logs: 'Logs', preview: 'Preview' },
+            modes: { label: 'Mode', single: 'Single File', batch: 'Batch' },
+            settings: {
+                gaslight: { label: 'Overwrite output', sublabel: '', tooltip: 'Allow replacing existing output files.' },
+                ghost: { label: 'Transparent mode', sublabel: 'Images only', tooltip: 'Make detected regions transparent instead of inpainting.' },
+                sigma_detect: { label: 'Max detection area', tooltip: 'Detections larger than this percentage are skipped.' },
+                detection_prompt: { label: 'Detection prompt', placeholder: 'watermark', tooltip: 'Tell the model what to detect.' },
+                output_format: { label: 'Output format', auto: 'Auto', png: 'PNG', jpg: 'JPG', webp: 'WEBP', mp4: 'MP4', avi: 'AVI' }
+            },
+            classes: { title: 'Class Mapping', group: 'Unified category', raw_classes: 'Raw model classes', output_label: 'Output label', fallback_prompt: 'Fallback prompt', empty: 'No classes are available. Check detection_classes.json.', hint: 'Selected raw classes are merged into one output label for mask generation.' },
+            video_settings: {
+                title: 'Video Settings',
+                detection_skip: { label: 'Detection interval', unit: 'frames', hint: 'Higher values are faster but may miss short-lived watermarks.' },
+                fade_in: { label: 'Lead buffer', hint: 'Extend the mask backward in time.' },
+                fade_out: { label: 'Tail buffer', hint: 'Extend the mask forward in time.' }
+            },
+            model_settings: { title: 'Florence Model', model_id: 'Model folder', adapter_dir: 'Adapter folder', max_new_tokens: 'Max tokens', num_beams: 'Beams', use_fast_processor: 'Fast processor' },
+            buttons: { preview: 'Preview Detection', preview_loading: 'Detecting...', start: 'Start Processing', start_processing: 'Processing...', stop: 'Stop', select_input: 'Select Input', try_again: 'Run Again', close: 'Close' },
+            compare: { title: 'Before / After', subtitle: 'Detection preview and processed output stay side by side.', waiting: 'Waiting', detecting: 'Detection preview', processing: 'Processing', done: 'Processed', before: 'Before', after: 'After', before_empty: 'Select an image or video.', after_empty: 'Detection boxes or processed output will appear here.', play: 'Play', pause: 'Pause', progress: 'Progress', speed: 'Speed' },
+            dropzone: { title: 'Select a file or folder', subtitle: 'Images, videos, and batch folders are supported', video_hint: 'Video file', image_hint: 'Image file', folder_hint: 'Batch folder' },
+            output: { placeholder: 'Defaults to the input folder' },
+            status_bar: { cuda: 'CUDA', ffmpeg: 'FFmpeg', ram: 'RAM', on: 'Available', off: 'Unavailable', cpu_mode: 'CPU Mode' },
+            preview_modal: { title: 'Detection Preview', prompt: 'Prompt:', detected: 'Detected:', source: 'Source:', regions: 'region(s)', bounding_boxes: 'Bounding Boxes', generated_text: 'Florence Generated Text', predictions_raw: 'Raw OD Predictions', of_image: '% of image', too_large: 'Skipped', loading: 'Detecting...', loading_hint: 'The first run may need to download model files.' },
+            processing_status: ['Preparing models...', 'Detecting watermark regions...', 'Building masks...', 'Running inpainting...', 'Writing output...'],
+            logs: { init: 'Interface ready.', starting: 'Processing started.', first_run_hint: 'First run may download model files.', done: 'Processing complete.', stopped: 'Task stopped.', no_input: 'Select an input path first.', ghost_video_warning: 'Transparent mode is not supported for videos. It has been disabled.', no_ffmpeg: 'FFmpeg was not detected. Video output may not include audio.', api_error: 'Backend API is unavailable. Start the app with run.sh or run.bat.', preview_failed: 'Preview failed:', preview_result: 'Detected {total} region(s); {accepted} will be processed.', cooking: 'Processing...' },
+            labels: { theme: 'Theme', language: 'Language', input_path: 'Input path', output_path: 'Output path', current_file: 'Current input', idle: 'Idle', progress: 'Progress', ready: 'Ready', not_selected: 'Not selected', api_unavailable: 'API disconnected' }
+        };
 
-        // Global functions for Python to call - dispatch events for Alpine to catch
-        function updateProgress(percent) {
-            window.dispatchEvent(new CustomEvent('pywebview-progress', {
-                detail: { percent }
-            }));
+        const defaultUiConfig = {
+            version: '1.0',
+            themes: [
+                { id: 'dark', name: 'Dark' },
+                { id: 'light', name: 'Light' }
+            ],
+            languages: [
+                { id: 'zh', icon: 'CN', name: '中文' },
+                { id: 'en', icon: 'EN', name: 'English' }
+            ]
+        };
+
+        const defaultDetectionClassConfig = {
+            version: 1,
+            default_group: 'watermark',
+            groups: [
+                {
+                    id: 'watermark',
+                    name: 'Watermark',
+                    name_zh: '水印',
+                    name_en: 'Watermark',
+                    output_label: 'watermark',
+                    task: 'od',
+                    description: 'Unified watermark category composed from raw Florence-2 labels.',
+                    description_zh: '由微调 Florence-2 输出的原始水印类别合并而成。',
+                    description_en: 'Unified watermark category composed from raw Florence-2 labels.',
+                    classes: [
+                        { id: 'sd_wm', name: 'SD Watermark', name_zh: 'SD 水印', name_en: 'SD Watermark' },
+                        { id: 'blur_wm', name: 'Blur Watermark', name_zh: '模糊水印', name_en: 'Blur Watermark' }
+                    ]
+                }
+            ]
+        };
+
+        const supportedVideoExt = ['mp4', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'webm'];
+        const supportedImageExt = ['png', 'jpg', 'jpeg', 'webp', 'bmp'];
+        const formatValues = ['None', 'PNG', 'JPG', 'WEBP', 'MP4', 'AVI'];
+        const defaultOutputPath = '/home/h3c/cbh_ws/water_marked/outputs';
+
+        const state = {
+            uiConfig: defaultUiConfig,
+            detectionClassConfig: defaultDetectionClassConfig,
+            t: fallbackText,
+            configLoaded: false,
+            mode: 'single',
+            overwrite: false,
+            transparent: false,
+            detection: 100,
+            format: 'None',
+            inputPath: '',
+            outputPath: defaultOutputPath,
+            processing: false,
+            progress: 0,
+            statusMsg: '',
+            theme: 'dark',
+            lang: 'zh',
+            detectionPrompt: 'watermark',
+            detectionGroup: 'watermark',
+            detectionOutputLabel: 'watermark',
+            detectionTask: 'auto',
+            selectedDetectionClasses: [],
+            detectionSkip: 1,
+            fadeIn: 0,
+            fadeOut: 0,
+            logs: [],
+            logSeq: Date.now(),
+            systemInfo: { cuda: false, gpu: '--', ffmpeg: false, ram: 0 },
+            preview: { loading: false, error: '', image: '', detections: [], prompt: '', source: '', generatedText: '', predictionsRaw: [], parsed: null },
+            compare: { before: null, after: null, status: 'waiting', outputPath: '', speed: 1, timeline: 0, playing: false },
+            florenceTest: {
+                modelId: '/home/h3c/cbh_ws/florence_train/fused_model',
+                adapterDir: '',
+                maxNewTokens: 256,
+                numBeams: 3,
+                useFastProcessor: true
+            },
+            statusTimer: null,
+            saveTimer: null
+        };
+
+        const $ = (selector, root = document) => root.querySelector(selector);
+        const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+        const el = {};
+
+        function api() {
+            return window.pywebview && window.pywebview.api ? window.pywebview.api : null;
         }
 
-        function addLog(msg, color = 'text-gray-400') {
-            window.dispatchEvent(new CustomEvent('pywebview-log', {
-                detail: { msg, color }
-            }));
+        function text(path, fallback = '') {
+            const fromLang = path.split('.').reduce((acc, part) => acc && acc[part], state.t);
+            if (typeof fromLang === 'string') return fromLang;
+            const fromFallback = path.split('.').reduce((acc, part) => acc && acc[part], fallbackText);
+            return typeof fromFallback === 'string' ? fromFallback : fallback;
         }
 
-        function processingComplete() {
-            window.dispatchEvent(new CustomEvent('pywebview-complete'));
+        function normalizeTheme(theme) {
+            const themes = state.uiConfig.themes.map(item => item.id);
+            return themes.includes(theme) ? theme : 'dark';
         }
 
-        // Theme switcher function
-        function switchTheme(themeName) {
-            const themes = ['theme-slay', 'theme-sigma', 'theme-witch', 'theme-korpo', 'theme-coquette', 'theme-xp', 'theme-anime'];
-            document.body.classList.remove(...themes);
-            if (themeName !== 'brainrot') {
-                document.body.classList.add('theme-' + themeName);
+        function normalizeLang(lang) {
+            const langs = state.uiConfig.languages.map(item => item.id);
+            return langs.includes(lang) ? lang : 'zh';
+        }
+
+        function normalizeFormat(format) {
+            return formatValues.includes(format) ? format : 'None';
+        }
+
+        function currentClassGroup() {
+            const groups = state.detectionClassConfig.groups || [];
+            return groups.find(group => group.id === state.detectionGroup) || groups[0] || null;
+        }
+
+        function classIds(group) {
+            return (group && Array.isArray(group.classes) ? group.classes : []).map(item => item.id || item).filter(Boolean);
+        }
+
+        function normalizeDetectionGroup(groupId) {
+            const groups = state.detectionClassConfig.groups || [];
+            if (groups.some(group => group.id === groupId)) return groupId;
+            return state.detectionClassConfig.default_group || (groups[0] && groups[0].id) || 'watermark';
+        }
+
+        function normalizeSelectedClasses(selected, group) {
+            const available = classIds(group);
+            const selectedSet = new Set(Array.isArray(selected) ? selected : []);
+            const normalized = available.filter(id => selectedSet.has(id));
+            return normalized.length ? normalized : available;
+        }
+
+        function localizedValue(item, key) {
+            if (!item) return '';
+            return item[`${key}_${state.lang}`] || item[key] || item.id || '';
+        }
+
+        function toUbuntuPath(path) {
+            if (path === null || path === undefined) return '';
+            let value = String(path).trim();
+            if (!value) return '';
+
+            if (value.startsWith('file://')) {
+                try {
+                    const url = new URL(value);
+                    if (url.protocol === 'file:') {
+                        value = decodeURIComponent(url.pathname || '');
+                    }
+                } catch (error) {
+                    // Keep the original text if it is not a valid URL.
+                }
             }
+
+            value = value.replace(/\\/g, '/');
+            const driveMatch = value.match(/^\/?([A-Za-z]):\/(.*)$/);
+            if (driveMatch) {
+                value = `/mnt/${driveMatch[1].toLowerCase()}/${driveMatch[2]}`;
+            }
+            return value;
         }
 
-        // i18n - Load language file
-        async function loadLanguage(lang) {
+        function extensionOf(path) {
+            path = toUbuntuPath(path);
+            if (!path || !path.includes('.')) return '';
+            return path.split('.').pop().toLowerCase();
+        }
+
+        function isVideoFile(path) {
+            return supportedVideoExt.includes(extensionOf(path));
+        }
+
+        function isImageFile(path) {
+            return supportedImageExt.includes(extensionOf(path));
+        }
+
+        function displayPath(path) {
+            return toUbuntuPath(path) || text('labels.not_selected', 'Not selected');
+        }
+
+        function setHidden(node, hidden) {
+            node.classList.toggle('hidden', Boolean(hidden));
+        }
+
+        async function fetchJson(url) {
+            const response = await fetch(url, { cache: 'no-store' });
+            if (!response.ok) throw new Error(response.statusText);
+            return response.json();
+        }
+
+        async function loadUiConfig() {
             try {
-                const response = await fetch(`lang/${lang}.json`);
-                if (!response.ok) throw new Error('Language file not found');
-                return await response.json();
-            } catch (e) {
-                console.error('Failed to load language:', lang, e);
-                // Fallback to brainrot
-                if (lang !== 'brainrot') {
-                    return await loadLanguage('brainrot');
-                }
-                return null;
+                state.uiConfig = await fetchJson('config.json');
+            } catch (error) {
+                state.uiConfig = defaultUiConfig;
             }
+            el.appVersion.textContent = 'v' + (state.uiConfig.version || '1.0');
+            fillSelects();
         }
 
-        function brainrotApp() {
+        async function loadDetectionClassConfig() {
+            try {
+                state.detectionClassConfig = await fetchJson('detection_classes.json');
+            } catch (error) {
+                state.detectionClassConfig = defaultDetectionClassConfig;
+            }
+            fillClassGroupSelect();
+            state.detectionGroup = normalizeDetectionGroup(state.detectionGroup);
+            const group = currentClassGroup();
+                state.detectionOutputLabel = group ? (group.output_label || group.id) : 'watermark';
+                state.detectionTask = group ? (group.task || 'auto') : 'auto';
+                state.selectedDetectionClasses = normalizeSelectedClasses(state.selectedDetectionClasses, group);
+        }
+
+        async function loadLanguage(lang) {
+            const safeLang = normalizeLang(lang);
+            try {
+                state.t = await fetchJson(`lang/${safeLang}.json`);
+            } catch (error) {
+                state.t = fallbackText;
+            }
+            state.lang = safeLang;
+            fillClassGroupSelect();
+            document.documentElement.lang = safeLang === 'zh' ? 'zh' : 'en';
+            document.title = text('app.title', 'Watermark Slayer');
+            translateStatic();
+            render();
+        }
+
+        function fillSelects() {
+            el.themeSelect.innerHTML = '';
+            state.uiConfig.themes.forEach(theme => {
+                const option = document.createElement('option');
+                option.value = theme.id;
+                option.textContent = theme.name || theme.id;
+                el.themeSelect.appendChild(option);
+            });
+
+            el.langSelect.innerHTML = '';
+            state.uiConfig.languages.forEach(lang => {
+                const option = document.createElement('option');
+                option.value = lang.id;
+                option.textContent = `${lang.icon ? lang.icon + ' ' : ''}${lang.name || lang.id}`;
+                el.langSelect.appendChild(option);
+            });
+        }
+
+        function fillClassGroupSelect() {
+            el.classGroupSelect.innerHTML = '';
+            const groups = state.detectionClassConfig.groups || [];
+            groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = localizedValue(group, 'name') || group.output_label || group.id;
+                el.classGroupSelect.appendChild(option);
+            });
+        }
+
+        function translateStatic() {
+            $$('[data-i18n]').forEach(node => {
+                node.textContent = text(node.dataset.i18n, node.textContent);
+            });
+            $$('[data-i18n-placeholder]').forEach(node => {
+                node.placeholder = text(node.dataset.i18nPlaceholder, node.placeholder);
+            });
+            $$('[data-tooltip-key]').forEach(node => {
+                const tooltip = text(node.dataset.tooltipKey, '');
+                if (tooltip) node.dataset.tooltip = tooltip;
+            });
+        }
+
+        function applyTheme(theme) {
+            state.theme = normalizeTheme(theme);
+            document.body.dataset.theme = state.theme;
+            el.themeSelect.value = state.theme;
+        }
+
+        function getConfig() {
             return {
-                isLoading: true, // Show loading screen until config loads
-                mode: 'single',
-                overwrite: false,
-                transparent: false,
-                detection: 15,
-                format: 'None',
-                inputPath: '',
-                outputPath: '',
-                processing: false,
-                progress: 0,
-                statusMsg: '',
-                theme: 'brainrot',  // Default theme for loading screen
-                lang: 'en',
-                t: {}, // translations
-                // Dynamic config loaded from config.json
-                appVersion: '',
-                availableThemes: [],
-                availableLanguages: [],
-                logSeq: Date.now(), // helps keep keys unique across reloads
-                logs: [],
-                systemInfo: {
-                    cuda: false,
-                    ram: 0,
-                    gpu: 'Checking...',
-                    ffmpeg: false
-                },
+                input_path: toUbuntuPath(state.inputPath),
+                output_path: toUbuntuPath(state.outputPath),
+                overwrite: state.overwrite,
+                transparent: state.transparent,
+                max_bbox_percent: state.detection,
+                force_format: state.format,
+                mode: state.mode,
+                detection_prompt: state.detectionPrompt,
+                detection_group: state.detectionGroup,
+                detection_classes: state.selectedDetectionClasses,
+                detection_output_label: state.detectionOutputLabel,
+                detection_task: state.detectionTask,
+                florence_model_id: toUbuntuPath(state.florenceTest.modelId),
+                florence_adapter_dir: toUbuntuPath(state.florenceTest.adapterDir),
+                florence_max_new_tokens: parseInt(state.florenceTest.maxNewTokens, 10) || 256,
+                florence_num_beams: parseInt(state.florenceTest.numBeams, 10) || 3,
+                florence_use_fast_processor: state.florenceTest.useFastProcessor,
+                detection_skip: parseInt(state.detectionSkip, 10) || 1,
+                fade_in: parseFloat(state.fadeIn) || 0,
+                fade_out: parseFloat(state.fadeOut) || 0,
+                theme: state.theme,
+                lang: state.lang
+            };
+        }
 
-                // Detection prompt
-                detectionPrompt: 'watermark',
-
-                // Preview modal state
-                previewMode: false,
-                previewLoading: false,
-                previewImage: null,
-                previewDetections: [],
-                previewPromptUsed: '',
-                previewSource: '',
-                previewError: null,
-
-                // Video settings (two-pass processing)
-                detectionSkip: 1,
-                fadeIn: 0,
-                fadeOut: 0,
-
-                
-                async init() {
-                    // Store reference for global Python callbacks
-                    window.appInstance = this;
-
-                    // Load UI config (themes, languages, version) from config.json
-                    try {
-                        const uiConfig = await fetch('config.json').then(r => r.json());
-                        this.appVersion = uiConfig.version || '0.0';
-                        this.availableThemes = uiConfig.themes || [];
-                        this.availableLanguages = uiConfig.languages || [];
-                    } catch (e) {
-                        console.log('Failed to load config.json, using defaults');
-                        this.appVersion = '0.0';
-                        this.availableThemes = [{ id: 'brainrot' }];
-                        this.availableLanguages = [{ id: 'brainrot', randomizable: true }, { id: 'en', randomizable: false }];
-                    }
-
-                    // Helper to pick random from array
-                    const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
-                    const randomizableThemes = this.availableThemes.map(t => t.id);
-                    const randomizableLangs = this.availableLanguages.filter(l => l.randomizable).map(l => l.id);
-
-                    // Load config when pywebview is ready
-                    const loadConfig = async () => {
-                        if (!window.pywebview?.api) return;
-                        try {
-                            const config = await pywebview.api.get_config() || {};
-                            console.log('Config loaded:', config);
-
-                            // Apply all settings
-                            this.inputPath = config.input_path || '';
-                            this.outputPath = config.output_path || '';
-                            this.overwrite = config.overwrite || false;
-                            this.transparent = config.transparent || false;
-                            this.detection = config.max_bbox_percent || 15;
-                            this.format = config.force_format || 'None';
-                            this.mode = config.mode || 'single';
-                            this.detectionPrompt = config.detection_prompt || 'watermark';
-                            this.detectionSkip = config.detection_skip || 1;
-                            this.fadeIn = config.fade_in || 0;
-                            this.fadeOut = config.fade_out || 0;
-
-                            // Theme & Language (always load, use saved or pick random)
-                            this.theme = config.theme || pickRandom(randomizableThemes);
-                            this.lang = config.lang || pickRandom(randomizableLangs);
-                            switchTheme(this.theme);
-                            await this.switchLang(this.lang);
-
-                            this._configLoaded = true;  // Now allow saving
-                            this.isLoading = false;     // Hide loading screen
-                        } catch (e) {
-                            console.log('Config load failed:', e);
-                            // Still need to load translations with defaults
-                            this.theme = pickRandom(randomizableThemes);
-                            this.lang = pickRandom(randomizableLangs);
-                            switchTheme(this.theme);
-                            await this.switchLang(this.lang);
-                            this.isLoading = false;
-                        }
-                    };
-
-                    // Try loading config now if pywebview ready, otherwise wait for event
-                    if (window.pywebview?.api) {
-                        await loadConfig();
-                    } else {
-                        window.addEventListener('pywebviewready', loadConfig);
-                        // Fallback timeout in case pywebview event never fires
-                        setTimeout(() => {
-                            if (this.isLoading) {
-                                console.log('Pywebview timeout, using random config');
-                                this.theme = pickRandom(randomizableThemes);
-                                this.lang = pickRandom(randomizableLangs);
-                                switchTheme(this.theme);
-                                this.switchLang(this.lang);
-                                this.isLoading = false;
-                            }
-                        }, 3000);
-                    }
-
-                    // Listen for pywebview events (guard against duplicate listeners when window reloads)
-                    if (window.__pywebviewLogHandler) {
-                        window.removeEventListener('pywebview-log', window.__pywebviewLogHandler);
-                    }
-                    window.__pywebviewLogHandler = (e) => {
-                        this.addLogEntry(e.detail.msg, e.detail.color);
-                    };
-                    window.addEventListener('pywebview-log', window.__pywebviewLogHandler);
-
-                    if (window.__pywebviewProgressHandler) {
-                        window.removeEventListener('pywebview-progress', window.__pywebviewProgressHandler);
-                    }
-                    window.__pywebviewProgressHandler = (e) => {
-                        this.progress = e.detail.percent;
-                    };
-                    window.addEventListener('pywebview-progress', window.__pywebviewProgressHandler);
-
-                    if (window.__pywebviewCompleteHandler) {
-                        window.removeEventListener('pywebview-complete', window.__pywebviewCompleteHandler);
-                    }
-                    window.__pywebviewCompleteHandler = () => {
-                        this.processing = false;
-                        this.progress = 100;
-                        this.addLogEntry(this.t.logs?.done || "Done! File processed successfully.", "text-neon-pink font-bold");
-                    };
-                    window.addEventListener('pywebview-complete', window.__pywebviewCompleteHandler);
-
-                    // Get static info once (CUDA, FFmpeg, GPU)
-                    this.loadStaticInfo();
-                    // Poll dynamic info (RAM, CPU) every 3 seconds
-                    setInterval(() => this.updateDynamicInfo(), 3000);
-                },
-
-                // Auto-save config (debounced)
-                _saveTimeout: null,
-                _configLoaded: false,  // Block saves until config is loaded
-                saveConfigDebounced() {
-                    if (!this._configLoaded) return;  // Don't save until config loaded
-                    clearTimeout(this._saveTimeout);
-                    this._saveTimeout = setTimeout(() => this.saveConfig(), 500);
-                },
-                async saveConfig() {
-                    if (window.pywebview?.api?.save_config) {
-                        try {
-                            await pywebview.api.save_config(this.getConfig());
-                        } catch (e) {
-                            console.log('Config save failed:', e);
-                        }
-                    }
-                },
-
-                async loadStaticInfo() {
-                    if (window.pywebview) {
-                        try {
-                            const info = await pywebview.api.get_static_info();
-                            this.systemInfo.cuda = info.cuda;
-                            this.systemInfo.gpu = info.gpu_name || 'CPU MODE';
-                            this.systemInfo.ffmpeg = info.ffmpeg;
-                        } catch (e) {
-                            // API not ready yet, retry
-                            setTimeout(() => this.loadStaticInfo(), 500);
-                        }
-                    } else {
-                        setTimeout(() => this.loadStaticInfo(), 500);
-                    }
-                },
-
-                async updateDynamicInfo() {
-                    if (window.pywebview) {
-                        try {
-                            const info = await pywebview.api.get_dynamic_info();
-                            this.systemInfo.ram = Math.round(info.ram_percent);
-                        } catch (e) {
-                            // ignore
-                        }
-                    }
-                },
-
-                isVideoFile(path) {
-                    if (!path) return false;
-                    const ext = path.toLowerCase().split('.').pop();
-                    return ['mp4', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'webm'].includes(ext);
-                },
-
-                async browseInput() {
-                    const picker =
-                        window.pywebview?.api?.browse_file ||
-                        (this.mode === 'single'
-                            ? window.pywebview?.api?.browse_file
-                            : window.pywebview?.api?.browse_folder);
-
-                    if (!picker) {
-                        this.addLogEntry(this.t.logs?.api_error || "API not available. Please run via run.bat/run.sh", "text-error");
-                        return;
-                    }
-
-                    const path =
-                        this.mode === 'single'
-                            ? await window.pywebview.api.browse_file()
-                            : await window.pywebview.api.browse_folder();
-
-                    if (path) {
-                        this.inputPath = path;
-                        this.saveConfigDebounced();
-                    }
-                },
-
-                async browseOutput() {
-                    if (!window.pywebview?.api?.browse_folder) {
-                        this.addLogEntry(this.t.logs?.api_error || "API not available. Please run via run.bat/run.sh", "text-error");
-                        return;
-                    }
-
-                    const path = await pywebview.api.browse_folder();
-                    if (path) {
-                        this.outputPath = path;
-                        this.saveConfigDebounced();
-                    }
-                },
-
-                async startProcessing() {
-                    if (!this.inputPath) {
-                        this.addLogEntry(this.t.logs?.no_input || "No input selected. Please select a file first.", "text-error");
-                        return;
-                    }
-
-                    // Check for video + transparency warning
-                    if (this.isVideoFile(this.inputPath) && this.transparent) {
-                        this.addLogEntry(this.t.logs?.ghost_video_warning || "Ghost mode doesn't work with videos. Turning it off.", "text-yellow-400");
-                        this.transparent = false;
-                    }
-
-                    // Check for FFmpeg warning
-                    if (this.isVideoFile(this.inputPath) && !this.systemInfo.ffmpeg) {
-                        this.addLogEntry(this.t.logs?.no_ffmpeg || "FFmpeg not found! Video will have no audio.", "text-yellow-400");
-                    }
-
-                    this.processing = true;
-                    this.progress = 0;
-                    this.addLogEntry(this.t.logs?.starting || "Starting process...", "text-white");
-                    this.addLogEntry(this.t.logs?.first_run_hint || "(First run may download AI models)", "text-gray-500");
-
-                    // Update status message randomly
-                    const statusInterval = setInterval(() => {
-                        if (this.processing && this.t.processing_status?.length > 0) {
-                            this.statusMsg = this.t.processing_status[Math.floor(Math.random() * this.t.processing_status.length)];
-                        } else {
-                            clearInterval(statusInterval);
-                        }
-                    }, 2000);
-
-                    if (window.pywebview && window.pywebview.api) {
-                        try {
-                            const result = await pywebview.api.start_processing({
-                                input: this.inputPath,
-                                output: this.outputPath,
-                                overwrite: this.overwrite,
-                                transparent: this.transparent,
-                                max_bbox: this.detection,
-                                format: this.format,
-                                mode: this.mode,
-                                detection_prompt: this.detectionPrompt || 'watermark',
-                                // Video settings
-                                detection_skip: parseInt(this.detectionSkip) || 1,
-                                fade_in: parseFloat(this.fadeIn) || 0,
-                                fade_out: parseFloat(this.fadeOut) || 0,
-                                // UI settings
-                                theme: this.theme,
-                                lang: this.lang
-                            });
-
-                            // Check for error response from backend
-                            if (result && result.error) {
-                                this.addLogEntry("Error: " + result.error, "text-error");
-                                this.processing = false;
-                                clearInterval(statusInterval);
-                                return;
-                            }
-                        } catch (e) {
-                            this.addLogEntry("Error: " + e.message, "text-error");
-                            this.processing = false;
-                            clearInterval(statusInterval);
-                        }
-                    } else {
-                        this.addLogEntry(this.t.logs?.api_error || "API not available. Please run via run.bat/run.sh", "text-error");
-                        this.processing = false;
-                        clearInterval(statusInterval);
-                    }
-                },
-
-                async stopProcessing() {
-                    if (window.pywebview) {
-                        await pywebview.api.stop_processing();
-                    }
-                    this.processing = false;
-                    this.addLogEntry(this.t.logs?.stopped || "Process stopped by user.", "text-error");
-                },
-
-                addLogEntry(msg, color = 'text-gray-400') {
-                    const now = new Date();
-                    const time = now.toTimeString().split(' ')[0];
-
-                    // Use push() - Alpine.js 3.x handles array mutations correctly
-                    this.logs.push({
-                        id: this.logSeq++,
-                        time: time,
-                        msg: msg,
-                        color: color
-                    });
-
-                    // Keep logs limited - use slice() to create new array instead of shift()
-                    if (this.logs.length > 100) {
-                        this.logs = this.logs.slice(-100);
-                    }
-
-                    // Auto scroll logs
-                    this.$nextTick(() => {
-                        const container = document.getElementById('logs-container');
-                        if (container) container.scrollTop = container.scrollHeight;
-                    });
-                },
-
-                // Preview detection
-                async runPreview() {
-                    if (!this.inputPath) {
-                        this.addLogEntry(this.t.logs?.no_input || "No input selected. Please select a file first.", "text-error");
-                        return;
-                    }
-
-                    this.previewLoading = true;
-                    this.previewError = null;
-                    this.previewImage = null;  // Clear old preview immediately
-                    this.previewDetections = [];
-                    this.previewMode = true;
-
-                    if (window.pywebview) {
-                        try {
-                            const result = await pywebview.api.preview_detection({
-                                input: this.inputPath,
-                                detection_prompt: this.detectionPrompt || 'watermark',
-                                max_bbox: this.detection
-                            });
-
-                            if (result.error) {
-                                this.previewError = result.error;
-                                this.previewImage = null;
-                                this.previewDetections = [];
-                                this.addLogEntry((this.t.logs?.preview_failed || "Preview failed:") + " " + result.error, "text-error");
-                            } else {
-                                this.previewImage = result.image;
-                                this.previewDetections = result.detections || [];
-                                this.previewPromptUsed = result.prompt_used;
-                                this.previewSource = result.source;
-                                this.previewError = null;
-
-                                const accepted = this.previewDetections.filter(d => d.accepted).length;
-                                const total = this.previewDetections.length;
-                                const msg = (this.t.logs?.preview_result || "Detected {total} regions, {accepted} will be removed.")
-                                    .replace('{total}', total)
-                                    .replace('{accepted}', accepted);
-                                this.addLogEntry(msg, "text-neon-cyan");
-                            }
-                        } catch (e) {
-                            this.previewError = "API error: " + e.message;
-                            this.addLogEntry((this.t.logs?.preview_failed || "Preview failed:") + " " + e.message, "text-error");
-                        }
-                    }
-
-                    this.previewLoading = false;
-                },
-
-                // Switch language
-                async switchLang(langCode) {
-                    const translations = await loadLanguage(langCode);
-                    if (translations) {
-                        this.t = translations;
-                        this.lang = langCode;
-                        // Update page title
-                        document.title = this.t.app?.title || 'WM Remover';
-                        // Set initial status message
-                        if (this.t.processing_status?.length > 0) {
-                            this.statusMsg = this.t.processing_status[0];
-                        }
-                        // Add init log if logs are empty
-                        if (this.logs.length === 0) {
-                            this.addLogEntry(this.t.logs?.init || 'System initialized.', 'text-gray-400');
-                        }
-                        // Auto-save config
-                        this.saveConfigDebounced();
-                    }
-                },
-
-                // Save config on window close (called from Python)
-                getConfig() {
-                    return {
-                        input_path: this.inputPath,
-                        output_path: this.outputPath,
-                        overwrite: this.overwrite,
-                        transparent: this.transparent,
-                        max_bbox_percent: this.detection,
-                        force_format: this.format,
-                        mode: this.mode,
-                        detection_prompt: this.detectionPrompt,
-                        // Video settings
-                        detection_skip: parseInt(this.detectionSkip) || 1,
-                        fade_in: parseFloat(this.fadeIn) || 0,
-                        fade_out: parseFloat(this.fadeOut) || 0,
-                        // Theme & Language
-                        theme: this.theme,
-                        lang: this.lang
-                    };
+        function saveConfigDebounced() {
+            if (!state.configLoaded || !api()) return;
+            clearTimeout(state.saveTimer);
+            state.saveTimer = setTimeout(async () => {
+                try {
+                    await api().save_config(getConfig());
+                } catch (error) {
+                    console.log('Config save failed:', error);
                 }
+            }, 400);
+        }
+
+        async function loadBackendConfig() {
+            if (!api()) return false;
+            try {
+                const config = await api().get_config() || {};
+                state.inputPath = toUbuntuPath(config.input_path || '');
+                state.outputPath = Object.prototype.hasOwnProperty.call(config, 'output_path') ? (toUbuntuPath(config.output_path || defaultOutputPath) || defaultOutputPath) : defaultOutputPath;
+                state.overwrite = Boolean(config.overwrite);
+                state.transparent = Boolean(config.transparent);
+                state.detection = Number(config.max_bbox_percent || 100);
+                state.format = normalizeFormat(config.force_format || 'None');
+                state.mode = config.mode === 'batch' ? 'batch' : 'single';
+                state.detectionPrompt = config.detection_prompt || 'watermark';
+                state.detectionGroup = normalizeDetectionGroup(config.detection_group || state.detectionClassConfig.default_group || 'watermark');
+                state.detectionOutputLabel = config.detection_output_label || (currentClassGroup() && currentClassGroup().output_label) || 'watermark';
+                state.detectionTask = config.detection_task || (currentClassGroup() && currentClassGroup().task) || 'auto';
+                state.selectedDetectionClasses = normalizeSelectedClasses(config.detection_classes || [], currentClassGroup());
+                state.florenceTest.modelId = Object.prototype.hasOwnProperty.call(config, 'florence_model_id') ? toUbuntuPath(config.florence_model_id) : state.florenceTest.modelId;
+                state.florenceTest.adapterDir = Object.prototype.hasOwnProperty.call(config, 'florence_adapter_dir') ? toUbuntuPath(config.florence_adapter_dir) : state.florenceTest.adapterDir;
+                state.florenceTest.maxNewTokens = parseInt(config.florence_max_new_tokens || state.florenceTest.maxNewTokens, 10);
+                state.florenceTest.numBeams = parseInt(config.florence_num_beams || state.florenceTest.numBeams, 10);
+                state.florenceTest.useFastProcessor = config.florence_use_fast_processor !== false;
+                state.detectionSkip = parseInt(config.detection_skip || 1, 10);
+                state.fadeIn = parseFloat(config.fade_in || 0);
+                state.fadeOut = parseFloat(config.fade_out || 0);
+                applyTheme(config.theme || 'dark');
+                await loadLanguage(config.lang || 'zh');
+                state.configLoaded = true;
+                addLogEntry(text('logs.init', 'Interface ready.'), 'info');
+                render();
+                await loadComparisonInput();
+                return true;
+            } catch (error) {
+                console.log('Config load failed:', error);
+                return false;
             }
         }
+
+        function waitForBackendConfig() {
+            return new Promise(resolve => {
+                let done = false;
+                const finish = value => {
+                    if (!done) {
+                        done = true;
+                        resolve(value);
+                    }
+                };
+                const attempt = async () => {
+                    const loaded = await loadBackendConfig();
+                    if (loaded) finish(true);
+                };
+                if (api()) {
+                    attempt();
+                } else {
+                    window.addEventListener('pywebviewready', attempt, { once: true });
+                    setTimeout(() => finish(false), 2500);
+                }
+            });
+        }
+
+        function bindElements() {
+            [
+                'appVersion', 'themeSelect', 'langSelect', 'modeSingle', 'modeBatch',
+                'inputPath', 'outputPath', 'browseInput', 'browseOutput',
+                'overwriteToggle', 'transparentToggle', 'detectionRange', 'detectionValue',
+                'detectionPrompt', 'formatSelect', 'videoPanel', 'detectionSkip',
+                'classGroupSelect', 'classGroupDescription', 'classOutputLabel', 'classCheckboxes',
+                'detectionSkipValue', 'fadeIn', 'fadeInValue', 'fadeOut', 'fadeOutValue',
+                'startButton', 'stopButton', 'previewButton', 'stageBrowse', 'dropZone',
+                'florenceModelId', 'browseFlorenceModel', 'florenceAdapterDir',
+                'browseFlorenceAdapter', 'florenceMaxTokens', 'florenceNumBeams',
+                'florenceUseFastProcessor', 'compareStatus', 'compareBeforeName',
+                'compareAfterName', 'compareBeforeImage', 'compareAfterImage',
+                'compareBeforeVideo', 'compareAfterVideo', 'compareBeforeEmpty',
+                'compareAfterEmpty', 'comparePlayPause', 'compareTimeline', 'compareSpeed',
+                'selectedTitle', 'selectedSubtitle', 'pathDisplay', 'fileKind',
+                'statusText', 'progressFill', 'progressValue', 'statusMessage',
+                'cudaState', 'ffmpegState', 'ramState', 'gpuState', 'logs', 'clearLogs',
+                'previewModal', 'closePreview', 'closePreviewFooter', 'previewLoading',
+                'previewError', 'previewImage', 'previewPrompt', 'previewCount',
+                'previewSource', 'previewDetections', 'previewGeneratedText',
+                'previewRawPredictions', 'rerunPreview'
+            ].forEach(id => {
+                el[id] = document.getElementById(id);
+            });
+        }
+
+        function bindEvents() {
+            el.themeSelect.addEventListener('change', () => {
+                applyTheme(el.themeSelect.value);
+                saveConfigDebounced();
+            });
+            el.langSelect.addEventListener('change', async () => {
+                await loadLanguage(el.langSelect.value);
+                saveConfigDebounced();
+            });
+
+            el.modeSingle.addEventListener('click', () => setMode('single'));
+            el.modeBatch.addEventListener('click', () => setMode('batch'));
+
+            el.inputPath.addEventListener('input', () => {
+                state.inputPath = toUbuntuPath(el.inputPath.value);
+                state.compare.after = null;
+                state.compare.outputPath = '';
+                state.compare.status = 'waiting';
+                saveConfigDebounced();
+                render();
+                loadComparisonInput();
+            });
+            el.outputPath.addEventListener('input', () => {
+                state.outputPath = toUbuntuPath(el.outputPath.value);
+                saveConfigDebounced();
+            });
+            el.browseInput.addEventListener('click', browseInput);
+            el.browseOutput.addEventListener('click', browseOutput);
+            el.stageBrowse.addEventListener('click', browseInput);
+            el.dropZone.addEventListener('click', browseInput);
+            el.dropZone.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    browseInput();
+                }
+            });
+            el.dropZone.addEventListener('dragover', event => {
+                event.preventDefault();
+                el.dropZone.classList.add('dragging');
+            });
+            el.dropZone.addEventListener('dragleave', () => el.dropZone.classList.remove('dragging'));
+            el.dropZone.addEventListener('drop', event => {
+                event.preventDefault();
+                el.dropZone.classList.remove('dragging');
+                const file = event.dataTransfer.files && event.dataTransfer.files[0];
+                if (file && file.path) {
+                    state.inputPath = toUbuntuPath(file.path);
+                    saveConfigDebounced();
+                    render();
+                }
+            });
+
+            el.overwriteToggle.addEventListener('change', () => {
+                state.overwrite = el.overwriteToggle.checked;
+                saveConfigDebounced();
+            });
+            el.transparentToggle.addEventListener('change', () => {
+                state.transparent = el.transparentToggle.checked;
+                saveConfigDebounced();
+                render();
+            });
+            el.detectionRange.addEventListener('input', () => {
+                state.detection = parseInt(el.detectionRange.value, 10);
+                render();
+            });
+            el.detectionRange.addEventListener('change', saveConfigDebounced);
+            el.detectionPrompt.addEventListener('input', () => {
+                state.detectionPrompt = el.detectionPrompt.value;
+                saveConfigDebounced();
+            });
+            el.classGroupSelect.addEventListener('change', () => {
+                state.detectionGroup = normalizeDetectionGroup(el.classGroupSelect.value);
+                const group = currentClassGroup();
+                state.detectionOutputLabel = group ? (group.output_label || group.id) : 'watermark';
+                state.detectionTask = group ? (group.task || 'auto') : 'auto';
+                state.selectedDetectionClasses = normalizeSelectedClasses([], group);
+                saveConfigDebounced();
+                render();
+            });
+            el.formatSelect.addEventListener('change', () => {
+                state.format = normalizeFormat(el.formatSelect.value);
+                saveConfigDebounced();
+            });
+            el.detectionSkip.addEventListener('input', () => {
+                state.detectionSkip = parseInt(el.detectionSkip.value, 10);
+                render();
+            });
+            el.detectionSkip.addEventListener('change', saveConfigDebounced);
+            el.fadeIn.addEventListener('input', () => {
+                state.fadeIn = parseFloat(el.fadeIn.value);
+                render();
+            });
+            el.fadeIn.addEventListener('change', saveConfigDebounced);
+            el.fadeOut.addEventListener('input', () => {
+                state.fadeOut = parseFloat(el.fadeOut.value);
+                render();
+            });
+            el.fadeOut.addEventListener('change', saveConfigDebounced);
+
+            el.startButton.addEventListener('click', startProcessing);
+            el.stopButton.addEventListener('click', stopProcessing);
+            el.previewButton.addEventListener('click', runPreview);
+            el.rerunPreview.addEventListener('click', runPreview);
+            el.browseFlorenceModel.addEventListener('click', () => browseFlorenceFolder('modelId'));
+            el.browseFlorenceAdapter.addEventListener('click', () => browseFlorenceFolder('adapterDir'));
+            el.florenceModelId.addEventListener('input', () => { state.florenceTest.modelId = toUbuntuPath(el.florenceModelId.value); saveConfigDebounced(); });
+            el.florenceAdapterDir.addEventListener('input', () => { state.florenceTest.adapterDir = toUbuntuPath(el.florenceAdapterDir.value); saveConfigDebounced(); });
+            el.florenceMaxTokens.addEventListener('input', () => { state.florenceTest.maxNewTokens = parseInt(el.florenceMaxTokens.value, 10) || 256; saveConfigDebounced(); });
+            el.florenceNumBeams.addEventListener('input', () => { state.florenceTest.numBeams = parseInt(el.florenceNumBeams.value, 10) || 3; saveConfigDebounced(); });
+            el.florenceUseFastProcessor.addEventListener('change', () => { state.florenceTest.useFastProcessor = el.florenceUseFastProcessor.checked; saveConfigDebounced(); });
+            el.comparePlayPause.addEventListener('click', toggleComparePlayback);
+            el.compareSpeed.addEventListener('change', () => {
+                state.compare.speed = parseFloat(el.compareSpeed.value) || 1;
+                applyCompareSpeed();
+            });
+            el.compareTimeline.addEventListener('input', () => seekCompareFromSlider());
+            el.compareBeforeVideo.addEventListener('timeupdate', syncCompareTimeline);
+            el.compareAfterVideo.addEventListener('timeupdate', syncCompareTimeline);
+            el.closePreview.addEventListener('click', closePreview);
+            el.closePreviewFooter.addEventListener('click', closePreview);
+            el.previewModal.addEventListener('click', event => {
+                if (event.target === el.previewModal) closePreview();
+            });
+            el.clearLogs.addEventListener('click', () => {
+                state.logs = [];
+                renderLogs();
+            });
+        }
+
+        function setMode(mode) {
+            state.mode = mode === 'batch' ? 'batch' : 'single';
+            saveConfigDebounced();
+            render();
+        }
+
+        async function browseInput() {
+            if (!api()) {
+                addLogEntry(text('logs.api_error'), 'error');
+                return;
+            }
+            try {
+                const path = state.mode === 'single'
+                    ? await api().browse_file()
+                    : await api().browse_folder();
+                if (path) {
+                    state.inputPath = toUbuntuPath(path);
+                    state.compare.after = null;
+                    state.compare.outputPath = '';
+                    state.compare.status = 'waiting';
+                    saveConfigDebounced();
+                    render();
+                    await loadComparisonInput();
+                }
+            } catch (error) {
+                addLogEntry(error.message, 'error');
+            }
+        }
+
+        async function browseOutput() {
+            if (!api()) {
+                addLogEntry(text('logs.api_error'), 'error');
+                return;
+            }
+            try {
+                const path = await api().browse_folder();
+                if (path) {
+                    state.outputPath = toUbuntuPath(path);
+                    saveConfigDebounced();
+                    render();
+                }
+            } catch (error) {
+                addLogEntry(error.message, 'error');
+            }
+        }
+
+        async function browseFlorenceFolder(key) {
+            if (!api()) {
+                addLogEntry(text('logs.api_error'), 'error');
+                return;
+            }
+            try {
+                const path = await api().browse_folder();
+                if (path) {
+                    state.florenceTest[key] = toUbuntuPath(path);
+                    saveConfigDebounced();
+                    renderModelSettings();
+                }
+            } catch (error) {
+                addLogEntry(error.message, 'error');
+            }
+        }
+
+        async function startProcessing() {
+            state.inputPath = toUbuntuPath(state.inputPath);
+            state.outputPath = toUbuntuPath(state.outputPath) || defaultOutputPath;
+            state.florenceTest.modelId = toUbuntuPath(state.florenceTest.modelId);
+            state.florenceTest.adapterDir = toUbuntuPath(state.florenceTest.adapterDir);
+
+            if (!state.inputPath) {
+                addLogEntry(text('logs.no_input'), 'error');
+                return;
+            }
+            if (!api()) {
+                addLogEntry(text('logs.api_error'), 'error');
+                return;
+            }
+            if (isVideoFile(state.inputPath) && state.transparent) {
+                state.transparent = false;
+                addLogEntry(text('logs.ghost_video_warning'), 'warning');
+            }
+            if (isVideoFile(state.inputPath) && !state.systemInfo.ffmpeg) {
+                addLogEntry(text('logs.no_ffmpeg'), 'warning');
+            }
+
+            state.processing = true;
+            state.progress = 0;
+            state.statusMsg = text('processing_status.0', text('logs.cooking'));
+            state.compare.status = 'processing';
+            state.compare.outputPath = '';
+            addLogEntry(text('logs.starting'), 'info');
+            addLogEntry(text('logs.first_run_hint'), 'muted');
+            startStatusTicker();
+            render();
+
+            try {
+                await loadComparisonInput();
+                await prepareDetectionComparison();
+                const result = await api().start_processing({
+                    input: toUbuntuPath(state.inputPath),
+                    output: toUbuntuPath(state.outputPath),
+                    overwrite: state.overwrite,
+                    transparent: state.transparent,
+                    max_bbox: state.detection,
+                    format: state.format,
+                    mode: state.mode,
+                    detection_prompt: state.detectionPrompt || 'watermark',
+                    detection_group: state.detectionGroup,
+                    detection_classes: state.selectedDetectionClasses,
+                    detection_output_label: state.detectionOutputLabel || 'watermark',
+                    detection_task: state.detectionTask || 'auto',
+                    florence_model_id: toUbuntuPath(state.florenceTest.modelId),
+                    florence_adapter_dir: toUbuntuPath(state.florenceTest.adapterDir),
+                    florence_max_new_tokens: parseInt(state.florenceTest.maxNewTokens, 10) || 256,
+                    florence_num_beams: parseInt(state.florenceTest.numBeams, 10) || 3,
+                    florence_use_fast_processor: state.florenceTest.useFastProcessor,
+                    detection_skip: parseInt(state.detectionSkip, 10) || 1,
+                    fade_in: parseFloat(state.fadeIn) || 0,
+                    fade_out: parseFloat(state.fadeOut) || 0,
+                    theme: state.theme,
+                    lang: state.lang
+                });
+                if (result && result.error) {
+                    addLogEntry(result.error, 'error');
+                    state.processing = false;
+                    stopStatusTicker();
+                    render();
+                }
+            } catch (error) {
+                addLogEntry(error.message, 'error');
+                state.processing = false;
+                stopStatusTicker();
+                render();
+            }
+        }
+
+        async function stopProcessing() {
+            if (api()) {
+                try {
+                    await api().stop_processing();
+                } catch (error) {
+                    addLogEntry(error.message, 'error');
+                }
+            }
+            state.processing = false;
+            stopStatusTicker();
+            addLogEntry(text('logs.stopped'), 'warning');
+            render();
+        }
+
+        async function runPreview() {
+            state.inputPath = toUbuntuPath(state.inputPath);
+            state.florenceTest.modelId = toUbuntuPath(state.florenceTest.modelId);
+            state.florenceTest.adapterDir = toUbuntuPath(state.florenceTest.adapterDir);
+
+            if (!state.inputPath) {
+                addLogEntry(text('logs.no_input'), 'error');
+                return;
+            }
+            if (!api()) {
+                addLogEntry(text('logs.api_error'), 'error');
+                return;
+            }
+
+            state.preview.loading = true;
+            state.preview.error = '';
+            state.preview.image = '';
+            state.preview.detections = [];
+            state.preview.generatedText = '';
+            state.preview.predictionsRaw = [];
+            state.preview.parsed = null;
+            openPreview();
+            renderPreview();
+
+            try {
+                const result = await api().preview_detection({
+                    input: toUbuntuPath(state.inputPath),
+                    detection_prompt: state.detectionPrompt || 'watermark',
+                    detection_group: state.detectionGroup,
+                    detection_classes: state.selectedDetectionClasses,
+                    detection_output_label: state.detectionOutputLabel || 'watermark',
+                    detection_task: state.detectionTask || 'auto',
+                    florence_model_id: toUbuntuPath(state.florenceTest.modelId),
+                    florence_adapter_dir: toUbuntuPath(state.florenceTest.adapterDir),
+                    florence_max_new_tokens: parseInt(state.florenceTest.maxNewTokens, 10) || 256,
+                    florence_num_beams: parseInt(state.florenceTest.numBeams, 10) || 3,
+                    florence_use_fast_processor: state.florenceTest.useFastProcessor,
+                    max_bbox: state.detection
+                });
+                if (result.error) {
+                    state.preview.error = result.error;
+                    addLogEntry(`${text('logs.preview_failed')} ${result.error}`, 'error');
+                } else {
+                    state.preview.image = result.image;
+                    state.preview.detections = result.detections || [];
+                    state.preview.generatedText = result.generated_text || '';
+                    state.preview.predictionsRaw = result.predictions_raw || [];
+                    state.preview.parsed = result.parsed || null;
+                    const rawClasses = result.raw_classes || state.selectedDetectionClasses || [];
+                    state.preview.prompt = rawClasses.length
+                        ? `${rawClasses.join(', ')} -> ${result.output_label || state.detectionOutputLabel || 'watermark'}`
+                        : (result.prompt_used || state.detectionPrompt);
+                    state.preview.source = result.source || state.inputPath;
+                    const accepted = state.preview.detections.filter(item => item.accepted).length;
+                    const total = state.preview.detections.length;
+                    addLogEntry(text('logs.preview_result').replace('{total}', total).replace('{accepted}', accepted), 'info');
+                }
+            } catch (error) {
+                state.preview.error = error.message;
+                addLogEntry(`${text('logs.preview_failed')} ${error.message}`, 'error');
+            } finally {
+                state.preview.loading = false;
+                renderPreview();
+            }
+        }
+
+        function openPreview() {
+            setHidden(el.previewModal, false);
+        }
+
+        function closePreview() {
+            setHidden(el.previewModal, true);
+        }
+
+        function startStatusTicker() {
+            stopStatusTicker();
+            state.statusTimer = setInterval(() => {
+                const items = Array.isArray(state.t.processing_status) ? state.t.processing_status : fallbackText.processing_status;
+                if (state.processing && items.length) {
+                    state.statusMsg = items[Math.floor(Math.random() * items.length)];
+                    renderProgress();
+                }
+            }, 2500);
+        }
+
+        function stopStatusTicker() {
+            if (state.statusTimer) {
+                clearInterval(state.statusTimer);
+                state.statusTimer = null;
+            }
+        }
+
+        function addLogEntry(message, color = 'muted') {
+            const type = normalizeLogType(color);
+            const now = new Date();
+            state.logs.push({
+                id: state.logSeq++,
+                time: now.toTimeString().slice(0, 8),
+                message,
+                type
+            });
+            if (state.logs.length > 150) state.logs = state.logs.slice(-150);
+            renderLogs();
+        }
+
+        function normalizeLogType(color) {
+            const value = String(color || '').toLowerCase();
+            if (value.includes('error') || value.includes('failed')) return 'error';
+            if (value.includes('warning') || value.includes('yellow')) return 'warning';
+            if (value.includes('green') || value.includes('success') || value.includes('cyan')) return 'success';
+            if (value.includes('info')) return 'info';
+            return 'muted';
+        }
+
+        function render() {
+            el.themeSelect.value = state.theme;
+            el.langSelect.value = state.lang;
+            el.inputPath.value = toUbuntuPath(state.inputPath);
+            el.outputPath.value = toUbuntuPath(state.outputPath);
+            el.overwriteToggle.checked = state.overwrite;
+            el.transparentToggle.checked = state.transparent;
+            el.detectionRange.value = state.detection;
+            el.detectionValue.textContent = `${state.detection}%`;
+            el.detectionPrompt.value = state.detectionPrompt;
+            renderClassMapping();
+            el.formatSelect.value = state.format;
+            el.detectionSkip.value = state.detectionSkip;
+            el.detectionSkipValue.textContent = state.detectionSkip;
+            el.fadeIn.value = state.fadeIn;
+            el.fadeInValue.textContent = Number(state.fadeIn).toFixed(1).replace('.0', '');
+            el.fadeOut.value = state.fadeOut;
+            el.fadeOutValue.textContent = Number(state.fadeOut).toFixed(1).replace('.0', '');
+
+            el.modeSingle.classList.toggle('active', state.mode === 'single');
+            el.modeBatch.classList.toggle('active', state.mode === 'batch');
+            setHidden(el.videoPanel, !isVideoFile(state.inputPath));
+
+            el.startButton.disabled = state.processing || !state.inputPath;
+            el.stopButton.disabled = !state.processing;
+            el.previewButton.disabled = state.processing || !state.inputPath;
+            el.startButton.textContent = state.processing ? text('buttons.start_processing') : text('buttons.start');
+
+            renderSelectedInput();
+            renderModelSettings();
+            renderComparison();
+            renderProgress();
+            renderSystem();
+            renderPreview();
+        }
+
+        function renderSelectedInput() {
+            const path = toUbuntuPath(state.inputPath);
+            el.pathDisplay.textContent = displayPath(path);
+            if (!path) {
+                el.selectedTitle.textContent = text('dropzone.title');
+                el.selectedSubtitle.textContent = text('dropzone.subtitle');
+                el.fileKind.textContent = text('labels.ready');
+                return;
+            }
+            el.selectedTitle.textContent = path.split(/[\\/]/).pop() || path;
+            el.selectedSubtitle.textContent = path;
+            if (isVideoFile(path)) {
+                el.fileKind.textContent = text('dropzone.video_hint');
+            } else if (isImageFile(path)) {
+                el.fileKind.textContent = text('dropzone.image_hint');
+            } else {
+                el.fileKind.textContent = state.mode === 'batch' ? text('dropzone.folder_hint') : text('labels.ready');
+            }
+        }
+
+        function renderClassMapping() {
+            const group = currentClassGroup();
+            el.classGroupSelect.value = state.detectionGroup;
+            el.classCheckboxes.innerHTML = '';
+
+            if (!group) {
+                el.classGroupDescription.textContent = text('classes.empty');
+                el.classOutputLabel.textContent = 'watermark';
+                return;
+            }
+
+            state.detectionOutputLabel = group.output_label || group.id || 'watermark';
+            state.detectionTask = group.task || state.detectionTask || 'auto';
+            el.classOutputLabel.textContent = state.detectionOutputLabel;
+            el.classGroupDescription.textContent = localizedValue(group, 'description') || text('classes.hint');
+
+            const classes = Array.isArray(group.classes) ? group.classes : [];
+            if (!classes.length) {
+                el.classCheckboxes.textContent = text('classes.empty');
+                return;
+            }
+
+            const selected = new Set(state.selectedDetectionClasses);
+            classes.forEach(item => {
+                const classId = item.id || item;
+                const label = localizedValue(item, 'name') || classId;
+                const row = document.createElement('label');
+                row.className = 'class-chip';
+                row.innerHTML = '<input type="checkbox"><span></span><code></code>';
+                const checkbox = row.querySelector('input');
+                checkbox.checked = selected.has(classId);
+                row.querySelector('span').textContent = label;
+                row.querySelector('code').textContent = classId;
+                checkbox.addEventListener('change', () => {
+                    const next = new Set(state.selectedDetectionClasses);
+                    if (checkbox.checked) {
+                        next.add(classId);
+                    } else {
+                        next.delete(classId);
+                    }
+                    state.selectedDetectionClasses = classIds(group).filter(id => next.has(id));
+                    saveConfigDebounced();
+                    renderClassMapping();
+                });
+                el.classCheckboxes.appendChild(row);
+            });
+        }
+
+        function renderModelSettings() {
+            el.florenceModelId.value = toUbuntuPath(state.florenceTest.modelId);
+            el.florenceAdapterDir.value = toUbuntuPath(state.florenceTest.adapterDir);
+            el.florenceMaxTokens.value = state.florenceTest.maxNewTokens;
+            el.florenceNumBeams.value = state.florenceTest.numBeams;
+            el.florenceUseFastProcessor.checked = state.florenceTest.useFastProcessor;
+        }
+
+        function mediaSrc(media) {
+            if (!media) return '';
+            if (media.kind === 'image' && media.data) {
+                return media.data_url || `data:${media.mime || 'image/png'};base64,${media.data}`;
+            }
+            if (media.kind === 'image' && media.url) return media.url;
+            if (media.kind === 'video' && media.url) {
+                return media.url;
+            }
+            return '';
+        }
+
+        function renderMedia(media, imgEl, videoEl, emptyEl) {
+            const src = mediaSrc(media);
+            const isImage = media && media.kind === 'image' && src;
+            const isVideo = media && media.kind === 'video' && src;
+
+            setHidden(imgEl, !isImage);
+            setHidden(videoEl, !isVideo);
+            setHidden(emptyEl, Boolean(isImage || isVideo));
+
+            if (isImage) {
+                imgEl.onerror = () => {
+                    if (media.url && imgEl.src !== media.url) {
+                        imgEl.src = media.url;
+                    }
+                };
+                imgEl.src = src;
+                imgEl.dataset.loaded = 'pending';
+                imgEl.onload = () => {
+                    imgEl.dataset.loaded = 'ok';
+                };
+            }
+            if (isVideo && videoEl.dataset.src !== src) {
+                videoEl.pause();
+                videoEl.src = src;
+                videoEl.dataset.src = src;
+                videoEl.load();
+            }
+        }
+
+        function renderComparison() {
+            const before = state.compare.before;
+            const after = state.compare.after;
+            renderMedia(before, el.compareBeforeImage, el.compareBeforeVideo, el.compareBeforeEmpty);
+            renderMedia(after, el.compareAfterImage, el.compareAfterVideo, el.compareAfterEmpty);
+
+            el.compareBeforeName.textContent = before ? (before.name || displayPath(before.path)) : '-';
+            el.compareAfterName.textContent = after ? (after.name || displayPath(after.path)) : '-';
+
+            const statusKey = state.compare.status === 'detecting' ? 'detecting' : (state.processing ? 'processing' : state.compare.status);
+            el.compareStatus.textContent = text(`compare.${statusKey}`, text('compare.waiting'));
+
+            const videoReady = before && after && before.kind === 'video' && after.kind === 'video';
+            el.comparePlayPause.disabled = !videoReady;
+            el.compareTimeline.disabled = !videoReady;
+            el.compareSpeed.disabled = !videoReady;
+            el.comparePlayPause.textContent = state.compare.playing ? text('compare.pause') : text('compare.play');
+            el.compareTimeline.value = state.compare.timeline;
+            el.compareSpeed.value = String(state.compare.speed);
+        }
+
+        async function loadComparisonInput() {
+            state.inputPath = toUbuntuPath(state.inputPath);
+            if (!api() || !state.inputPath || (!isImageFile(state.inputPath) && !isVideoFile(state.inputPath))) {
+                state.compare.before = null;
+                renderComparison();
+                return;
+            }
+            try {
+                const media = await api().get_media(state.inputPath);
+                if (!media.error) {
+                    state.compare.before = media;
+                } else {
+                    addLogEntry(media.error, 'warning');
+                }
+            } catch (error) {
+                addLogEntry(error.message, 'warning');
+            }
+            renderComparison();
+        }
+
+        async function prepareDetectionComparison() {
+            state.inputPath = toUbuntuPath(state.inputPath);
+            state.florenceTest.modelId = toUbuntuPath(state.florenceTest.modelId);
+            state.florenceTest.adapterDir = toUbuntuPath(state.florenceTest.adapterDir);
+            if (!api() || !state.inputPath || (!isImageFile(state.inputPath) && !isVideoFile(state.inputPath))) return;
+
+            state.compare.status = 'detecting';
+            state.compare.after = null;
+            renderComparison();
+
+            try {
+                const result = await api().preview_detection({
+                    input: toUbuntuPath(state.inputPath),
+                    detection_prompt: state.detectionPrompt || 'watermark',
+                    detection_group: state.detectionGroup,
+                    detection_classes: state.selectedDetectionClasses,
+                    detection_output_label: state.detectionOutputLabel || 'watermark',
+                    detection_task: state.detectionTask || 'auto',
+                    florence_model_id: toUbuntuPath(state.florenceTest.modelId),
+                    florence_adapter_dir: toUbuntuPath(state.florenceTest.adapterDir),
+                    florence_max_new_tokens: parseInt(state.florenceTest.maxNewTokens, 10) || 256,
+                    florence_num_beams: parseInt(state.florenceTest.numBeams, 10) || 3,
+                    florence_use_fast_processor: state.florenceTest.useFastProcessor,
+                    max_bbox: state.detection
+                });
+                if (!result.error && result.image) {
+                    state.compare.after = {
+                        kind: 'image',
+                        mime: 'image/png',
+                        data: result.image,
+                        name: text('compare.detecting'),
+                        path: result.source || state.inputPath
+                    };
+                    state.compare.status = 'processing';
+                } else if (result.error) {
+                    addLogEntry(`${text('logs.preview_failed')} ${result.error}`, 'warning');
+                    state.compare.status = 'processing';
+                }
+            } catch (error) {
+                addLogEntry(`${text('logs.preview_failed')} ${error.message}`, 'warning');
+                state.compare.status = 'processing';
+            }
+            renderComparison();
+        }
+
+        function handleProcessingOutput(media) {
+            if (!media || media.error) return;
+            media.path = toUbuntuPath(media.path || '');
+            state.compare.after = media;
+            state.compare.outputPath = media.path || '';
+            state.compare.status = 'done';
+            state.compare.timeline = 0;
+            state.compare.playing = false;
+            renderComparison();
+            applyCompareSpeed();
+        }
+
+        function compareDuration() {
+            const before = el.compareBeforeVideo;
+            const after = el.compareAfterVideo;
+            const durations = [before.duration, after.duration].filter(value => Number.isFinite(value) && value > 0);
+            return durations.length ? Math.min(...durations) : 0;
+        }
+
+        function applyCompareSpeed() {
+            const speed = parseFloat(state.compare.speed) || 1;
+            el.compareBeforeVideo.playbackRate = speed;
+            el.compareAfterVideo.playbackRate = speed;
+        }
+
+        function toggleComparePlayback() {
+            const before = el.compareBeforeVideo;
+            const after = el.compareAfterVideo;
+            if (!(state.compare.before && state.compare.after && state.compare.before.kind === 'video' && state.compare.after.kind === 'video')) return;
+
+            applyCompareSpeed();
+            if (state.compare.playing) {
+                before.pause();
+                after.pause();
+                state.compare.playing = false;
+            } else {
+                const targetTime = before.currentTime || after.currentTime || 0;
+                before.currentTime = targetTime;
+                after.currentTime = targetTime;
+                Promise.allSettled([before.play(), after.play()]);
+                state.compare.playing = true;
+            }
+            renderComparison();
+        }
+
+        function seekCompareFromSlider() {
+            state.compare.timeline = parseInt(el.compareTimeline.value, 10) || 0;
+            const duration = compareDuration();
+            if (!duration) return;
+            const targetTime = duration * (state.compare.timeline / 1000);
+            el.compareBeforeVideo.currentTime = targetTime;
+            el.compareAfterVideo.currentTime = targetTime;
+        }
+
+        function syncCompareTimeline() {
+            const duration = compareDuration();
+            if (!duration || document.activeElement === el.compareTimeline) return;
+            state.compare.timeline = Math.round((el.compareBeforeVideo.currentTime / duration) * 1000);
+            el.compareTimeline.value = state.compare.timeline;
+        }
+
+        function renderProgress() {
+            const progress = Math.max(0, Math.min(100, Number(state.progress || 0)));
+            el.progressFill.style.width = `${progress}%`;
+            el.progressValue.textContent = `${progress}%`;
+            el.statusText.textContent = state.processing ? text('logs.cooking') : text('labels.idle');
+            el.statusMessage.textContent = state.statusMsg || text('labels.ready');
+        }
+
+        function renderSystem() {
+            el.cudaState.textContent = state.systemInfo.cuda ? text('status_bar.on') : text('status_bar.off');
+            el.cudaState.className = state.systemInfo.cuda ? 'ok' : 'warn';
+            el.ffmpegState.textContent = state.systemInfo.ffmpeg ? text('status_bar.on') : text('status_bar.off');
+            el.ffmpegState.className = state.systemInfo.ffmpeg ? 'ok' : 'warn';
+            el.ramState.textContent = state.systemInfo.ram ? `${Math.round(state.systemInfo.ram)}%` : '--';
+            el.gpuState.textContent = state.systemInfo.gpu || text('status_bar.cpu_mode');
+        }
+
+        function renderLogs() {
+            el.logs.innerHTML = '';
+            state.logs.forEach(item => {
+                const row = document.createElement('div');
+                row.className = `log-row ${item.type}`;
+                row.innerHTML = `<span>${item.time}</span><p></p>`;
+                row.querySelector('p').textContent = item.message;
+                el.logs.appendChild(row);
+            });
+            el.logs.scrollTop = el.logs.scrollHeight;
+        }
+
+        function renderPreview() {
+            setHidden(el.previewLoading, !state.preview.loading);
+            setHidden(el.previewError, !state.preview.error);
+            setHidden(el.previewImage, !state.preview.image);
+
+            if (state.preview.error) {
+                el.previewError.textContent = state.preview.error;
+            }
+            if (state.preview.image) {
+                el.previewImage.src = `data:image/png;base64,${state.preview.image}`;
+            }
+
+            el.previewPrompt.textContent = state.preview.prompt || state.detectionPrompt || '-';
+            el.previewCount.textContent = state.preview.detections.length;
+            el.previewSource.textContent = state.preview.source || state.inputPath || '-';
+            el.previewDetections.innerHTML = '';
+            el.previewGeneratedText.textContent = state.preview.generatedText || '';
+            el.previewRawPredictions.textContent = JSON.stringify({
+                predictions_raw: state.preview.predictionsRaw || [],
+                parsed: state.preview.parsed
+            }, null, 2);
+
+            state.preview.detections.forEach((det, index) => {
+                const row = document.createElement('div');
+                row.className = `bbox-row ${det.accepted ? 'accepted' : 'skipped'}`;
+                const area = typeof det.area_percent === 'number' ? det.area_percent : '-';
+                row.innerHTML = `
+                    <span>#${index + 1}</span>
+                    <code>${Array.isArray(det.bbox) ? det.bbox.join(', ') : '-'}</code>
+                    <strong>${det.raw_label || det.query_label || '-'} -> ${det.output_label || state.detectionOutputLabel || 'watermark'}</strong>
+                    <strong>${area}${text('preview_modal.of_image')}</strong>
+                    <em></em>
+                `;
+                row.querySelector('em').textContent = det.accepted ? text('status_bar.on') : text('preview_modal.too_large');
+                el.previewDetections.appendChild(row);
+            });
+        }
+
+        async function loadStaticInfo() {
+            if (!api()) {
+                setTimeout(loadStaticInfo, 800);
+                return;
+            }
+            try {
+                const info = await api().get_static_info();
+                state.systemInfo.cuda = Boolean(info.cuda);
+                state.systemInfo.gpu = info.gpu_name || text('status_bar.cpu_mode');
+                state.systemInfo.ffmpeg = Boolean(info.ffmpeg);
+                renderSystem();
+            } catch (error) {
+                setTimeout(loadStaticInfo, 1000);
+            }
+        }
+
+        async function updateDynamicInfo() {
+            if (!api()) return;
+            try {
+                const info = await api().get_dynamic_info();
+                state.systemInfo.ram = Number(info.ram_percent || 0);
+                renderSystem();
+            } catch (error) {
+                // Dynamic info is optional.
+            }
+        }
+
+        function exposePythonCallbacks() {
+            window.updateProgress = percent => {
+                state.progress = parseInt(percent, 10) || 0;
+                if (state.compare.before && state.compare.before.kind === 'video' && !(state.compare.after && state.compare.after.kind === 'video')) {
+                    state.compare.timeline = Math.max(0, Math.min(1000, Math.round(state.progress * 10)));
+                    el.compareTimeline.value = state.compare.timeline;
+                    if (Number.isFinite(el.compareBeforeVideo.duration) && el.compareBeforeVideo.duration > 0) {
+                        el.compareBeforeVideo.currentTime = el.compareBeforeVideo.duration * (state.progress / 100);
+                    }
+                }
+                renderProgress();
+            };
+            window.addLog = (message, color) => {
+                addLogEntry(message, color);
+            };
+            window.processingOutput = media => {
+                handleProcessingOutput(media);
+            };
+            window.processingOutputPath = async path => {
+                path = toUbuntuPath(path);
+                if (!api() || !path) return;
+                try {
+                    const media = await api().get_media(path);
+                    handleProcessingOutput(media);
+                } catch (error) {
+                    addLogEntry(error.message, 'warning');
+                }
+            };
+            window.processingComplete = () => {
+                state.processing = false;
+                state.progress = 100;
+                state.compare.status = state.compare.outputPath ? 'done' : 'waiting';
+                state.statusMsg = text('logs.done');
+                stopStatusTicker();
+                addLogEntry(text('logs.done'), 'success');
+                render();
+            };
+        }
+
+        async function init() {
+            bindElements();
+            exposePythonCallbacks();
+            await loadUiConfig();
+            await loadDetectionClassConfig();
+            bindEvents();
+            applyTheme('dark');
+            await loadLanguage('zh');
+
+            const loaded = await waitForBackendConfig();
+            if (!loaded) {
+                state.configLoaded = false;
+                addLogEntry(text('logs.api_error'), 'warning');
+                render();
+            }
+
+            loadStaticInfo();
+            updateDynamicInfo();
+            setInterval(updateDynamicInfo, 3000);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>

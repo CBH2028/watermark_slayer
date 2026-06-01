@@ -3,7 +3,7 @@ set -e
 
 echo ""
 echo "  ============================================="
-echo "     WatermarkRemover-AI Setup (Linux/macOS)"
+echo "     Watermark Slayer Setup (Linux/macOS)"
 echo "  ============================================="
 echo ""
 
@@ -73,9 +73,9 @@ source $VENV_DIR/bin/activate
 # Upgrade pip
 echo "  [*] Upgrading pip..."
 if [ "$CHINA_MODE" == "1" ]; then
-    pip install --upgrade pip setuptools wheel $PIP_MIRROR -q
+    pip install --upgrade pip setuptools wheel $PIP_MIRROR 
 else
-    pip install --upgrade pip setuptools wheel -q
+    pip install --upgrade pip setuptools wheel 
 fi
 
 # Install PyTorch based on platform
@@ -83,9 +83,9 @@ echo "  [*] Installing PyTorch..."
 if [ "$OS_TYPE" == "macos" ]; then
     # macOS: Install from main PyPI (supports MPS on Apple Silicon)
     if [ "$CHINA_MODE" == "1" ]; then
-        pip install torch>=2.4.0 torchvision>=0.19.0 --no-cache-dir $PIP_MIRROR -q
+        pip install "torch>=2.4.0" "torchvision>=0.19.0" --no-cache-dir $PIP_MIRROR 
     else
-        pip install torch>=2.4.0 torchvision>=0.19.0 --no-cache-dir -q
+        pip install "torch>=2.4.0" "torchvision>=0.19.0" --no-cache-dir 
     fi
     echo "  [OK] PyTorch installed (MPS support on Apple Silicon)"
 else
@@ -93,17 +93,17 @@ else
     if command -v nvidia-smi &> /dev/null; then
         echo "  [*] NVIDIA GPU detected, installing CUDA version..."
         if [ "$CHINA_MODE" == "1" ]; then
-            pip install torch>=2.4.0 torchvision>=0.19.0 --extra-index-url https://download.pytorch.org/whl/cu124 --no-cache-dir $PIP_MIRROR -q
+            pip install "torch==2.4.0" "torchvision==0.19.0" --extra-index-url https://download.pytorch.org/whl/cu118 --no-cache-dir $PIP_MIRROR 
         else
-            pip install torch>=2.4.0 torchvision>=0.19.0 --extra-index-url https://download.pytorch.org/whl/cu124 --no-cache-dir -q
+            pip install "torch>=2.4.0" "torchvision>=0.19.0" --extra-index-url https://download.pytorch.org/whl/cu118 --no-cache-dir 
         fi
         echo "  [OK] PyTorch installed (CUDA 12.4)"
     else
         echo "  [*] No NVIDIA GPU detected, installing CPU version..."
         if [ "$CHINA_MODE" == "1" ]; then
-            pip install torch>=2.4.0 torchvision>=0.19.0 --no-cache-dir $PIP_MIRROR -q
+            pip install "torch>=2.4.0" "torchvision>=0.19.0" --no-cache-dir $PIP_MIRROR 
         else
-            pip install torch>=2.4.0 torchvision>=0.19.0 --no-cache-dir -q
+            pip install "torch>=2.4.0" "torchvision>=0.19.0" --no-cache-dir 
         fi
         echo "  [OK] PyTorch installed (CPU)"
     fi
@@ -112,31 +112,31 @@ fi
 # Install other dependencies (without torch lines)
 echo "  [*] Installing other dependencies..."
 if [ "$CHINA_MODE" == "1" ]; then
-    pip install transformers>=4.50.0 diffusers>=0.30.0 "numpy<2" --no-cache-dir $PIP_MIRROR -q
-    pip install "opencv-python-headless>=4.8.0,<4.12.0" "Pillow>=10.0.0" --no-cache-dir $PIP_MIRROR -q
-    pip install pywebview>=4.0 --no-cache-dir $PIP_MIRROR -q
-    pip install loguru click tqdm psutil pyyaml --no-cache-dir $PIP_MIRROR -q
+    pip install "transformers>=4.50.0" "diffusers>=0.30.0" "numpy<2" --no-cache-dir $PIP_MIRROR 
+    pip install "opencv-python-headless>=4.8.0,<4.12.0" "Pillow>=10.0.0" --no-cache-dir $PIP_MIRROR 
+    pip install "pywebview>=4.0" --no-cache-dir $PIP_MIRROR 
+    pip install loguru click tqdm psutil pyyaml --no-cache-dir $PIP_MIRROR 
 else
-    pip install transformers>=4.50.0 diffusers>=0.30.0 "numpy<2" --no-cache-dir -q
-    pip install "opencv-python-headless>=4.8.0,<4.12.0" "Pillow>=10.0.0" --no-cache-dir -q
-    pip install pywebview>=4.0 --no-cache-dir -q
-    pip install loguru click tqdm psutil pyyaml --no-cache-dir -q
+    pip install "transformers>=4.50.0" "diffusers>=0.30.0" "numpy<2" --no-cache-dir 
+    pip install "opencv-python-headless>=4.8.0,<4.12.0" "Pillow>=10.0.0" --no-cache-dir 
+    pip install "pywebview>=4.0" --no-cache-dir 
+    pip install loguru click tqdm psutil pyyaml --no-cache-dir 
 fi
 
 # Install iopaint separately (no deps to avoid conflicts)
 echo "  [*] Installing iopaint..."
 if [ "$CHINA_MODE" == "1" ]; then
-    pip install iopaint --no-deps --no-cache-dir $PIP_MIRROR -q
+    pip install iopaint --no-deps --no-cache-dir $PIP_MIRROR 
 else
-    pip install iopaint --no-deps --no-cache-dir -q
+    pip install iopaint --no-deps --no-cache-dir 
 fi
 
 # Install iopaint's required dependencies manually (subset needed for LaMA inpainting)
 echo "  [*] Installing iopaint dependencies..."
 if [ "$CHINA_MODE" == "1" ]; then
-    pip install pydantic typer einops omegaconf easydict yacs --no-cache-dir $PIP_MIRROR -q
+    pip install pydantic typer einops omegaconf easydict yacs --no-cache-dir $PIP_MIRROR 
 else
-    pip install pydantic typer einops omegaconf easydict yacs --no-cache-dir -q
+    pip install pydantic typer einops omegaconf easydict yacs --no-cache-dir 
 fi
 echo "  [OK] Dependencies installed"
 
@@ -168,17 +168,17 @@ echo "  ============================================="
 echo ""
 echo "  To run the app:"
 echo "    source venv/bin/activate"
-echo "    python remwmgui.py"
+echo "    python watermark_slayer_gui.py"
 echo ""
 echo "  Or for CLI:"
 echo "    source venv/bin/activate"
-echo "    python remwm.py input.png output/"
+echo "    python watermark_slayer.py input.png output/"
 echo ""
 
 # Ask to launch
 read -p "  Launch now? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "  Starting WatermarkRemover-AI..."
-    python remwmgui.py
+    echo "  Starting Watermark Slayer..."
+    python watermark_slayer_gui.py
 fi

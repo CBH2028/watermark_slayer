@@ -1,88 +1,135 @@
 {
   "app": {
-    "title": "Watermark Remover AI"
+    "title": "Watermark Slayer",
+    "subtitle": "Local AI watermark detection and inpainting"
+  },
+  "sections": {
+    "input": "Input",
+    "output": "Output",
+    "settings": "Processing",
+    "classes": "Class Mapping",
+    "video": "Video",
+    "system": "System",
+    "logs": "Logs",
+    "preview": "Preview"
   },
   "modes": {
-    "label": "Processing Mode",
+    "label": "Mode",
     "single": "Single File",
-    "single_tooltip": "Process one image or video file at a time.",
-    "batch": "Batch (Folder)",
-    "batch_tooltip": "Process all images/videos in a folder at once."
+    "single_tooltip": "Process one image or video file.",
+    "batch": "Batch",
+    "batch_tooltip": "Process all supported files in a folder."
   },
   "settings": {
     "gaslight": {
-      "label": "Overwrite Files",
+      "label": "Overwrite output",
       "sublabel": "",
-      "tooltip": "Overwrite existing output files instead of skipping them."
+      "tooltip": "Allow replacing existing output files."
     },
     "ghost": {
-      "label": "Transparent Mode",
-      "sublabel": "(for LoRA training)",
-      "tooltip": "Make watermark area transparent instead of filling it. Recommended for LoRA training datasets - enable alpha masking in your LoRA trainer. (PNG/WEBP only)"
+      "label": "Transparent mode",
+      "sublabel": "Images only",
+      "tooltip": "Make detected regions transparent instead of inpainting."
     },
     "sigma_detect": {
-      "label": "Max Detection Size",
-      "tooltip": "Max watermark size as % of image. Detections larger than this will be skipped."
+      "label": "Max detection area",
+      "tooltip": "Detections larger than this percentage of the image are skipped."
     },
     "detection_prompt": {
-      "label": "Detection Prompt",
+      "label": "Detection prompt",
       "placeholder": "watermark",
-      "tooltip": "What to detect and remove. Try: watermark, logo, text, signature, etc."
+      "tooltip": "Tell the model what to detect, such as watermark, logo, or text."
     },
     "output_format": {
-      "label": "Output Format",
-      "tooltip": "Choose output file format. Auto keeps the original format.",
-      "auto": "Auto (Keep Original)",
-      "png": "PNG (Lossless)",
-      "jpg": "JPG (Compressed)",
-      "webp": "WEBP (Modern)",
-      "mp4": "MP4 (Video)",
-      "avi": "AVI (Video)"
+      "label": "Output format",
+      "tooltip": "Auto keeps the original format when possible.",
+      "auto": "Auto",
+      "png": "PNG",
+      "jpg": "JPG",
+      "webp": "WEBP",
+      "mp4": "MP4",
+      "avi": "AVI"
     }
   },
   "video_settings": {
     "title": "Video Settings",
     "detection_skip": {
-      "label": "Detection Skip",
+      "label": "Detection interval",
       "unit": "frames",
-      "hint": "Higher = faster processing, but might miss short watermarks."
+      "hint": "Higher values are faster but may miss short-lived watermarks."
     },
     "fade_in": {
-      "label": "Fade In Buffer",
-      "hint": "Extend removal backwards in time (for fading in watermarks)."
+      "label": "Lead buffer",
+      "hint": "Extend the mask backward in time."
     },
     "fade_out": {
-      "label": "Fade Out Buffer",
-      "hint": "Extend removal forwards in time (for fading out watermarks)."
+      "label": "Tail buffer",
+      "hint": "Extend the mask forward in time."
     }
   },
+  "classes": {
+    "title": "Class Mapping",
+    "group": "Unified category",
+    "raw_classes": "Raw model classes",
+    "output_label": "Output label",
+    "fallback_prompt": "Fallback prompt",
+    "empty": "No classes are available. Check detection_classes.json.",
+    "hint": "Selected raw classes are merged into one output label for mask generation."
+  },
+  "model_settings": {
+    "title": "Florence Model",
+    "model_id": "Model folder",
+    "adapter_dir": "Adapter folder",
+    "max_new_tokens": "Max tokens",
+    "num_beams": "Beams",
+    "use_fast_processor": "Fast processor"
+  },
+  "compare": {
+    "title": "Before / After",
+    "subtitle": "Detection preview and processed output stay side by side.",
+    "waiting": "Waiting",
+    "detecting": "Detection preview",
+    "processing": "Processing",
+    "done": "Processed",
+    "before": "Before",
+    "after": "After",
+    "before_empty": "Select an image or video.",
+    "after_empty": "Detection boxes or processed output will appear here.",
+    "play": "Play",
+    "pause": "Pause",
+    "progress": "Progress",
+    "speed": "Speed"
+  },
   "buttons": {
-    "preview": "🔍 Preview Detection",
-    "preview_tooltip": "See what the AI detects before processing. Shows bounding boxes.",
-    "preview_loading": "🔄 Detecting...",
+    "preview": "Preview Detection",
+    "preview_tooltip": "Check detected regions before processing.",
+    "preview_loading": "Detecting...",
     "start": "Start Processing",
     "start_processing": "Processing...",
     "stop": "Stop",
     "browse": "Browse",
-    "try_again": "🔄 Try Again",
+    "select_input": "Select Input",
+    "select_output": "Select Output",
+    "try_again": "Run Again",
     "close": "Close",
-    "copy_error": "📋 Copy Error"
+    "copy_error": "Copy Error"
   },
   "dropzone": {
-    "title": "Drop Files Here",
-    "subtitle": "or click to browse",
-    "video_hint": "video file - click to change",
-    "image_hint": "click to change"
+    "title": "Select a file or folder",
+    "subtitle": "Images, videos, and batch folders are supported",
+    "video_hint": "Video file",
+    "image_hint": "Image file",
+    "folder_hint": "Batch folder"
   },
   "output": {
-    "placeholder": "Output folder..."
+    "placeholder": "Defaults to the input folder"
   },
   "status_bar": {
     "cuda": "CUDA",
     "ffmpeg": "FFmpeg",
     "ram": "RAM",
-    "on": "ON",
-    "off": "OFF",
+    "on": "Available",
+    "off": "Unavailable",
     "cpu_mode": "CPU Mode"
   },
   "preview_modal": {
@@ -91,38 +138,45 @@
     "detected": "Detected:",
     "source": "Source:",
     "regions": "region(s)",
-    "bounding_boxes": "Bounding Boxes:",
+    "bounding_boxes": "Bounding Boxes",
+    "generated_text": "Florence Generated Text",
+    "predictions_raw": "Raw OD Predictions",
     "of_image": "% of image",
-    "too_large": "(too large, will skip)",
-    "loading": "Loading preview...",
-    "loading_hint": "(First run may download ~1.5GB model)"
+    "too_large": "Skipped",
+    "loading": "Detecting...",
+    "loading_hint": "The first run may need to download model files."
   },
-  "marquee": "WATERMARK REMOVER AI /// POWERED BY FLORENCE-2 AND LAMA /// REMOVE WATERMARKS WITH AI ///",
   "processing_status": [
-    "Processing...",
-    "Detecting watermarks...",
-    "Applying inpainting...",
-    "Almost done...",
-    "Removing watermark...",
-    "Running AI model...",
-    "Analyzing image...",
-    "Finishing up..."
+    "Preparing models...",
+    "Detecting watermark regions...",
+    "Building masks...",
+    "Running inpainting...",
+    "Writing output..."
   ],
   "logs": {
-    "init": "System initialized.",
-    "starting": "Starting process...",
-    "first_run_hint": "(First run may download AI models)",
-    "done": "Done! File processed successfully.",
-    "stopped": "Process stopped by user.",
-    "no_input": "No input selected. Please select a file first.",
-    "ghost_video_warning": "Transparent mode doesn't work with videos. Disabling.",
-    "no_ffmpeg": "FFmpeg not found. Video will have no audio.",
-    "api_error": "API not available. Please run via run.bat/run.sh",
+    "init": "Interface ready.",
+    "starting": "Processing started.",
+    "first_run_hint": "First run may download model files.",
+    "done": "Processing complete.",
+    "stopped": "Task stopped.",
+    "no_input": "Select an input path first.",
+    "ghost_video_warning": "Transparent mode is not supported for videos. It has been disabled.",
+    "no_ffmpeg": "FFmpeg was not detected. Video output may not include audio.",
+    "api_error": "Backend API is unavailable. Start the app with run.sh or run.bat.",
     "preview_failed": "Preview failed:",
-    "preview_result": "Detected {total} regions, {accepted} will be removed.",
+    "preview_result": "Detected {total} region(s); {accepted} will be processed.",
     "cooking": "Processing..."
   },
-  "lang": {
-    "label": "Language"
+  "labels": {
+    "theme": "Theme",
+    "language": "Language",
+    "input_path": "Input path",
+    "output_path": "Output path",
+    "current_file": "Current input",
+    "idle": "Idle",
+    "progress": "Progress",
+    "ready": "Ready",
+    "not_selected": "Not selected",
+    "api_unavailable": "API disconnected"
   }
 }

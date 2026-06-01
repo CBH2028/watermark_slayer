@@ -1,8 +1,8 @@
-# WatermarkRemover-AI
+# Watermark Slayer
 
 **AI-Powered Watermark Removal Tool using Florence-2 and LaMA Models**
 
-🇬🇧 English | 🇫🇷 Français | 🇨🇳 中文 | 🇯🇵 日本語 | 🇧🇷 Português | 🧠 Brainrot
+🇨🇳 中文 | 🇬🇧 English
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
@@ -10,7 +10,7 @@
 
 ## Overview
 
-`WatermarkRemover-AI` is a cutting-edge application that leverages AI models for precise watermark detection and seamless removal. Perfect for removing watermarks from AI-generated videos like Sora, Sora 2, Runway, and others.
+`Watermark Slayer` is a cutting-edge application that leverages AI models for precise watermark detection and seamless removal. Perfect for removing watermarks from AI-generated videos like Sora, Sora 2, Runway, and others.
 
 It uses Florence-2 from Microsoft for watermark identification and LaMA for inpainting to fill in the removed regions naturally. The software features a modern GUI built with PyWebview for an accessible and intuitive experience.
 
@@ -36,8 +36,8 @@ https://github.com/user-attachments/assets/505be2a8-8eda-4def-90b6-5a4ceefee456
 - **Preview Mode** - Preview detected watermarks before processing
 - **Fade In/Out Handling** - Extend masks for watermarks that fade in/out
 - **GPU Acceleration** - CUDA support for faster processing
-- **Multi-Language UI** - Available in English, French, Chinese, Japanese, Portuguese, and more
-- **Themes** - Multiple UI themes to choose from
+- **Bilingual UI** - Clean Chinese and English interface
+- **Professional Themes** - Focused dark and light themes
 
 ---
 
@@ -48,8 +48,8 @@ https://github.com/user-attachments/assets/505be2a8-8eda-4def-90b6-5a4ceefee456
 The setup script downloads a portable Python environment automatically - no system Python required.
 
 ```powershell
-git clone https://github.com/D-Ogi/WatermarkRemover-AI.git
-cd WatermarkRemover-AI
+git clone https://github.com/yijia0110/watermark_slayer.git
+cd watermark_slayer
 .\setup.ps1
 ```
 
@@ -60,8 +60,8 @@ After setup, double-click `run.bat` to launch the app.
 Requires Python 3.10+ installed on your system.
 
 ```bash
-git clone https://github.com/D-Ogi/WatermarkRemover-AI.git
-cd WatermarkRemover-AI
+git clone https://github.com/yijia0110/watermark_slayer.git
+cd watermark_slayer
 chmod +x setup.sh
 ./setup.sh
 ```
@@ -94,16 +94,16 @@ Your settings are automatically saved and restored on next launch.
 
 ```bash
 # Basic usage
-python remwm.py input.png output_folder/
+python watermark_slayer.py input.png output_folder/
 
 # With options
-python remwm.py ./images ./output --overwrite --max-bbox-percent=15 --force-format=PNG
+python watermark_slayer.py ./images ./output --overwrite --max-bbox-percent=15 --force-format=PNG
 
 # Process video with two-pass detection
-python remwm.py video.mp4 ./output --detection-skip=3 --fade-in=0.5 --fade-out=0.5
+python watermark_slayer.py video.mp4 ./output --detection-skip=3 --fade-in=0.5 --fade-out=0.5
 
 # Preview mode (detect without processing)
-python remwm.py input.png --preview
+python watermark_slayer.py input.png --preview
 ```
 
 ### CLI Options
@@ -112,7 +112,7 @@ python remwm.py input.png --preview
 |--------|-------------|
 | `--overwrite` | Overwrite existing files |
 | `--transparent` | Make watermark regions transparent (images only) |
-| `--max-bbox-percent` | Max detection size as % of image (default: 10) |
+| `--max-bbox-percent` | Max detection size as % of image (default: 100) |
 | `--force-format` | Force output format (PNG, WEBP, JPG, MP4, AVI) |
 | `--detection-prompt` | Custom detection prompt (default: "watermark") |
 | `--detection-skip` | Detect every N frames for videos (1-10, default: 1) |
@@ -136,7 +136,7 @@ python remwm.py input.png --preview
 - **Florence-2** - Microsoft's vision model for watermark detection
 - **LaMA** - Large Mask Inpainting model
 - **PyWebview** - Cross-platform webview wrapper
-- **Alpine.js** - Lightweight JavaScript framework for UI
+- **Vanilla JavaScript** - Lightweight local UI logic
 - **PyTorch** - Deep learning backend
 
 ---
@@ -159,6 +159,6 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=D-Ogi/WatermarkRemover-AI&type=date&legend=top-left)](https://www.star-history.com/#D-Ogi/WatermarkRemover-AI&type=date&legend=top-left)
+[![Star History Chart](https://api.star-history.com/svg?repos=yijia0110/watermark_slayer&type=date&legend=top-left)](https://www.star-history.com/#yijia0110/watermark_slayer&type=date&legend=top-left)
 
 
