@@ -325,7 +325,7 @@
                 <button id="closePreview" type="button" class="icon-button close" aria-label="Close">x</button>
             </header>
             <div id="previewBody" class="preview-body">
-                <div id="previewLoading" class="preview-state hidden">
+                <div id="previewLoading" class="preview-appState hidden">
                     <div class="loader"></div>
                     <strong data-i18n="preview_modal.loading">Detecting...</strong>
                     <span data-i18n="preview_modal.loading_hint">The first run may need to download model files.</span>
@@ -369,7 +369,7 @@
     </div>
 
     <script>
-        const fallbackText = {
+        const defaultCopy = {
             app: { title: 'Watermark Slayer', subtitle: 'Local AI watermark detection and inpainting' },
             sections: { input: 'Input', output: 'Output', settings: 'Processing', video: 'Video', system: 'System', logs: 'Logs', preview: 'Preview' },
             modes: { label: 'Mode', single: 'Single File', batch: 'Batch' },
@@ -399,7 +399,7 @@
             labels: { theme: 'Theme', language: 'Language', input_path: 'Input path', output_path: 'Output path', current_file: 'Current input', idle: 'Idle', progress: 'Progress', ready: 'Ready', not_selected: 'Not selected', api_unavailable: 'API disconnected' }
         };
 
-        const defaultUiConfig = {
+        const bundledUiConfig = {
             version: '1.0',
             themes: [
                 { id: 'dark', name: 'Dark' },
@@ -411,7 +411,7 @@
             ]
         };
 
-        const defaultDetectionClassConfig = {
+        const bundledDetectionConfig = {
             version: 1,
             default_group: 'watermark',
             groups: [
@@ -433,15 +433,15 @@
             ]
         };
 
-        const supportedVideoExt = ['mp4', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'webm'];
-        const supportedImageExt = ['png', 'jpg', 'jpeg', 'webp', 'bmp'];
-        const formatValues = ['None', 'PNG', 'JPG', 'WEBP', 'MP4', 'AVI'];
-        const defaultOutputPath = '/home/h3c/cbh_ws/water_marked/outputs';
+        const supportedVideoExtensions = ['mp4', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'webm'];
+        const supportedImageExtensions = ['png', 'jpg', 'jpeg', 'webp', 'bmp'];
+        const outputFormatValues = ['None', 'PNG', 'JPG', 'WEBP', 'MP4', 'AVI'];
+        const fallbackOutputPath = '/home/h3c/cbh_ws/water_marked/outputs';
 
-        const state = {
-            uiConfig: defaultUiConfig,
-            detectionClassConfig: defaultDetectionClassConfig,
-            t: fallbackText,
+        const appState = {
+            uiConfig: bundledUiConfig,
+            detectionClassConfig: bundledDetectionConfig,
+            t: defaultCopy,
             configLoaded: false,
             mode: 'single',
             overwrite: false,
@@ -449,7 +449,7 @@
             detection: 100,
             format: 'None',
             inputPath: '',
-            outputPath: defaultOutputPath,
+            outputPath: fallbackOutputPath,
             processing: false,
             progress: 0,
             statusMsg: '',
@@ -482,61 +482,61 @@
         const $ = (selector, root = document) => root.querySelector(selector);
         const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
-        const el = {};
+        const dom = {};
 
-        function api() {
+        function slayerApi() {
             return window.pywebview && window.pywebview.api ? window.pywebview.api : null;
         }
 
         function text(path, fallback = '') {
-            const fromLang = path.split('.').reduce((acc, part) => acc && acc[part], state.t);
+            const fromLang = path.split('.').reduce((acc, part) => acc && acc[part], appState.t);
             if (typeof fromLang === 'string') return fromLang;
-            const fromFallback = path.split('.').reduce((acc, part) => acc && acc[part], fallbackText);
+            const fromFallback = path.split('.').reduce((acc, part) => acc && acc[part], defaultCopy);
             return typeof fromFallback === 'string' ? fromFallback : fallback;
         }
 
-        function normalizeTheme(theme) {
-            const themes = state.uiConfig.themes.map(item => item.id);
+        function normalizeThemeChoice(theme) {
+            const themes = appState.uiConfig.themes.map(item => item.id);
             return themes.includes(theme) ? theme : 'dark';
         }
 
-        function normalizeLang(lang) {
-            const langs = state.uiConfig.languages.map(item => item.id);
+        function normalizeLanguageChoice(lang) {
+            const langs = appState.uiConfig.languages.map(item => item.id);
             return langs.includes(lang) ? lang : 'zh';
         }
 
-        function normalizeFormat(format) {
-            return formatValues.includes(format) ? format : 'None';
+        function normalizeOutputFormat(format) {
+            return outputFormatValues.includes(format) ? format : 'None';
         }
 
-        function currentClassGroup() {
-            const groups = state.detectionClassConfig.groups || [];
-            return groups.find(group => group.id === state.detectionGroup) || groups[0] || null;
+        function activeClassGroup() {
+            const groups = appState.detectionClassConfig.groups || [];
+            return groups.find(group => group.id === appState.detectionGroup) || groups[0] || null;
         }
 
-        function classIds(group) {
+        function classGroupIds(group) {
             return (group && Array.isArray(group.classes) ? group.classes : []).map(item => item.id || item).filter(Boolean);
         }
 
-        function normalizeDetectionGroup(groupId) {
-            const groups = state.detectionClassConfig.groups || [];
+        function normalizeClassGroup(groupId) {
+            const groups = appState.detectionClassConfig.groups || [];
             if (groups.some(group => group.id === groupId)) return groupId;
-            return state.detectionClassConfig.default_group || (groups[0] && groups[0].id) || 'watermark';
+            return appState.detectionClassConfig.default_group || (groups[0] && groups[0].id) || 'watermark';
         }
 
-        function normalizeSelectedClasses(selected, group) {
-            const available = classIds(group);
+        function normalizeClassSelection(selected, group) {
+            const available = classGroupIds(group);
             const selectedSet = new Set(Array.isArray(selected) ? selected : []);
             const normalized = available.filter(id => selectedSet.has(id));
             return normalized.length ? normalized : available;
         }
 
-        function localizedValue(item, key) {
+        function localizedClassValue(item, key) {
             if (!item) return '';
-            return item[`${key}_${state.lang}`] || item[key] || item.id || '';
+            return item[`${key}_${appState.lang}`] || item[key] || item.id || '';
         }
 
-        function toUbuntuPath(path) {
+        function normalizeRuntimePath(path) {
             if (path === null || path === undefined) return '';
             let value = String(path).trim();
             if (!value) return '';
@@ -560,103 +560,103 @@
             return value;
         }
 
-        function extensionOf(path) {
-            path = toUbuntuPath(path);
+        function extensionForPath(path) {
+            path = normalizeRuntimePath(path);
             if (!path || !path.includes('.')) return '';
             return path.split('.').pop().toLowerCase();
         }
 
-        function isVideoFile(path) {
-            return supportedVideoExt.includes(extensionOf(path));
+        function pathIsVideo(path) {
+            return supportedVideoExtensions.includes(extensionForPath(path));
         }
 
-        function isImageFile(path) {
-            return supportedImageExt.includes(extensionOf(path));
+        function pathIsImage(path) {
+            return supportedImageExtensions.includes(extensionForPath(path));
         }
 
-        function displayPath(path) {
-            return toUbuntuPath(path) || text('labels.not_selected', 'Not selected');
+        function formatPathLabel(path) {
+            return normalizeRuntimePath(path) || text('labels.not_selected', 'Not selected');
         }
 
-        function setHidden(node, hidden) {
+        function toggleHidden(node, hidden) {
             node.classList.toggle('hidden', Boolean(hidden));
         }
 
-        async function fetchJson(url) {
+        async function fetchJsonAsset(url) {
             const response = await fetch(url, { cache: 'no-store' });
             if (!response.ok) throw new Error(response.statusText);
             return response.json();
         }
 
-        async function loadUiConfig() {
+        async function loadUiManifest() {
             try {
-                state.uiConfig = await fetchJson('config.json');
+                appState.uiConfig = await fetchJsonAsset('config.json');
             } catch (error) {
-                state.uiConfig = defaultUiConfig;
+                appState.uiConfig = bundledUiConfig;
             }
-            el.appVersion.textContent = 'v' + (state.uiConfig.version || '1.0');
-            fillSelects();
+            dom.appVersion.textContent = 'v' + (appState.uiConfig.version || '1.0');
+            populateUiSelects();
         }
 
-        async function loadDetectionClassConfig() {
+        async function loadDetectionClassManifest() {
             try {
-                state.detectionClassConfig = await fetchJson('detection_classes.json');
+                appState.detectionClassConfig = await fetchJsonAsset('detection_classes.json');
             } catch (error) {
-                state.detectionClassConfig = defaultDetectionClassConfig;
+                appState.detectionClassConfig = bundledDetectionConfig;
             }
-            fillClassGroupSelect();
-            state.detectionGroup = normalizeDetectionGroup(state.detectionGroup);
-            const group = currentClassGroup();
-                state.detectionOutputLabel = group ? (group.output_label || group.id) : 'watermark';
-                state.detectionTask = group ? (group.task || 'auto') : 'auto';
-                state.selectedDetectionClasses = normalizeSelectedClasses(state.selectedDetectionClasses, group);
+            populateClassGroups();
+            appState.detectionGroup = normalizeClassGroup(appState.detectionGroup);
+            const group = activeClassGroup();
+            appState.detectionOutputLabel = group ? (group.output_label || group.id) : 'watermark';
+            appState.detectionTask = group ? (group.task || 'auto') : 'auto';
+            appState.selectedDetectionClasses = normalizeClassSelection(appState.selectedDetectionClasses, group);
         }
 
-        async function loadLanguage(lang) {
-            const safeLang = normalizeLang(lang);
+        async function loadLanguagePack(lang) {
+            const safeLang = normalizeLanguageChoice(lang);
             try {
-                state.t = await fetchJson(`lang/${safeLang}.json`);
+                appState.t = await fetchJsonAsset(`lang/${safeLang}.json`);
             } catch (error) {
-                state.t = fallbackText;
+                appState.t = defaultCopy;
             }
-            state.lang = safeLang;
-            fillClassGroupSelect();
+            appState.lang = safeLang;
+            populateClassGroups();
             document.documentElement.lang = safeLang === 'zh' ? 'zh' : 'en';
             document.title = text('app.title', 'Watermark Slayer');
-            translateStatic();
-            render();
+            applyTranslations();
+            renderApp();
         }
 
-        function fillSelects() {
-            el.themeSelect.innerHTML = '';
-            state.uiConfig.themes.forEach(theme => {
+        function populateUiSelects() {
+            dom.themeSelect.innerHTML = '';
+            appState.uiConfig.themes.forEach(theme => {
                 const option = document.createElement('option');
                 option.value = theme.id;
                 option.textContent = theme.name || theme.id;
-                el.themeSelect.appendChild(option);
+                dom.themeSelect.appendChild(option);
             });
 
-            el.langSelect.innerHTML = '';
-            state.uiConfig.languages.forEach(lang => {
+            dom.langSelect.innerHTML = '';
+            appState.uiConfig.languages.forEach(lang => {
                 const option = document.createElement('option');
                 option.value = lang.id;
                 option.textContent = `${lang.icon ? lang.icon + ' ' : ''}${lang.name || lang.id}`;
-                el.langSelect.appendChild(option);
+                dom.langSelect.appendChild(option);
             });
         }
 
-        function fillClassGroupSelect() {
-            el.classGroupSelect.innerHTML = '';
-            const groups = state.detectionClassConfig.groups || [];
+        function populateClassGroups() {
+            dom.classGroupSelect.innerHTML = '';
+            const groups = appState.detectionClassConfig.groups || [];
             groups.forEach(group => {
                 const option = document.createElement('option');
                 option.value = group.id;
-                option.textContent = localizedValue(group, 'name') || group.output_label || group.id;
-                el.classGroupSelect.appendChild(option);
+                option.textContent = localizedClassValue(group, 'name') || group.output_label || group.id;
+                dom.classGroupSelect.appendChild(option);
             });
         }
 
-        function translateStatic() {
+        function applyTranslations() {
             $$('[data-i18n]').forEach(node => {
                 node.textContent = text(node.dataset.i18n, node.textContent);
             });
@@ -669,81 +669,81 @@
             });
         }
 
-        function applyTheme(theme) {
-            state.theme = normalizeTheme(theme);
-            document.body.dataset.theme = state.theme;
-            el.themeSelect.value = state.theme;
+        function applyThemeChoice(theme) {
+            appState.theme = normalizeThemeChoice(theme);
+            document.body.dataset.theme = appState.theme;
+            dom.themeSelect.value = appState.theme;
         }
 
-        function getConfig() {
+        function collectBridgeState() {
             return {
-                input_path: toUbuntuPath(state.inputPath),
-                output_path: toUbuntuPath(state.outputPath),
-                overwrite: state.overwrite,
-                transparent: state.transparent,
-                max_bbox_percent: state.detection,
-                force_format: state.format,
-                mode: state.mode,
-                detection_prompt: state.detectionPrompt,
-                detection_group: state.detectionGroup,
-                detection_classes: state.selectedDetectionClasses,
-                detection_output_label: state.detectionOutputLabel,
-                detection_task: state.detectionTask,
-                florence_model_id: toUbuntuPath(state.florenceTest.modelId),
-                florence_adapter_dir: toUbuntuPath(state.florenceTest.adapterDir),
-                florence_max_new_tokens: parseInt(state.florenceTest.maxNewTokens, 10) || 256,
-                florence_num_beams: parseInt(state.florenceTest.numBeams, 10) || 3,
-                florence_use_fast_processor: state.florenceTest.useFastProcessor,
-                detection_skip: parseInt(state.detectionSkip, 10) || 1,
-                fade_in: parseFloat(state.fadeIn) || 0,
-                fade_out: parseFloat(state.fadeOut) || 0,
-                theme: state.theme,
-                lang: state.lang
+                input_path: normalizeRuntimePath(appState.inputPath),
+                output_path: normalizeRuntimePath(appState.outputPath),
+                overwrite: appState.overwrite,
+                transparent: appState.transparent,
+                max_bbox_percent: appState.detection,
+                force_format: appState.format,
+                mode: appState.mode,
+                detection_prompt: appState.detectionPrompt,
+                detection_group: appState.detectionGroup,
+                detection_classes: appState.selectedDetectionClasses,
+                detection_output_label: appState.detectionOutputLabel,
+                detection_task: appState.detectionTask,
+                florence_model_id: normalizeRuntimePath(appState.florenceTest.modelId),
+                florence_adapter_dir: normalizeRuntimePath(appState.florenceTest.adapterDir),
+                florence_max_new_tokens: parseInt(appState.florenceTest.maxNewTokens, 10) || 256,
+                florence_num_beams: parseInt(appState.florenceTest.numBeams, 10) || 3,
+                florence_use_fast_processor: appState.florenceTest.useFastProcessor,
+                detection_skip: parseInt(appState.detectionSkip, 10) || 1,
+                fade_in: parseFloat(appState.fadeIn) || 0,
+                fade_out: parseFloat(appState.fadeOut) || 0,
+                theme: appState.theme,
+                lang: appState.lang
             };
         }
 
-        function saveConfigDebounced() {
-            if (!state.configLoaded || !api()) return;
-            clearTimeout(state.saveTimer);
-            state.saveTimer = setTimeout(async () => {
+        function queueBridgeStateSave() {
+            if (!appState.configLoaded || !slayerApi()) return;
+            clearTimeout(appState.saveTimer);
+            appState.saveTimer = setTimeout(async () => {
                 try {
-                    await api().save_config(getConfig());
+                    await slayerApi().store_ui_state(collectBridgeState());
                 } catch (error) {
                     console.log('Config save failed:', error);
                 }
             }, 400);
         }
 
-        async function loadBackendConfig() {
-            if (!api()) return false;
+        async function restoreBridgeState() {
+            if (!slayerApi()) return false;
             try {
-                const config = await api().get_config() || {};
-                state.inputPath = toUbuntuPath(config.input_path || '');
-                state.outputPath = Object.prototype.hasOwnProperty.call(config, 'output_path') ? (toUbuntuPath(config.output_path || defaultOutputPath) || defaultOutputPath) : defaultOutputPath;
-                state.overwrite = Boolean(config.overwrite);
-                state.transparent = Boolean(config.transparent);
-                state.detection = Number(config.max_bbox_percent || 100);
-                state.format = normalizeFormat(config.force_format || 'None');
-                state.mode = config.mode === 'batch' ? 'batch' : 'single';
-                state.detectionPrompt = config.detection_prompt || 'watermark';
-                state.detectionGroup = normalizeDetectionGroup(config.detection_group || state.detectionClassConfig.default_group || 'watermark');
-                state.detectionOutputLabel = config.detection_output_label || (currentClassGroup() && currentClassGroup().output_label) || 'watermark';
-                state.detectionTask = config.detection_task || (currentClassGroup() && currentClassGroup().task) || 'auto';
-                state.selectedDetectionClasses = normalizeSelectedClasses(config.detection_classes || [], currentClassGroup());
-                state.florenceTest.modelId = Object.prototype.hasOwnProperty.call(config, 'florence_model_id') ? toUbuntuPath(config.florence_model_id) : state.florenceTest.modelId;
-                state.florenceTest.adapterDir = Object.prototype.hasOwnProperty.call(config, 'florence_adapter_dir') ? toUbuntuPath(config.florence_adapter_dir) : state.florenceTest.adapterDir;
-                state.florenceTest.maxNewTokens = parseInt(config.florence_max_new_tokens || state.florenceTest.maxNewTokens, 10);
-                state.florenceTest.numBeams = parseInt(config.florence_num_beams || state.florenceTest.numBeams, 10);
-                state.florenceTest.useFastProcessor = config.florence_use_fast_processor !== false;
-                state.detectionSkip = parseInt(config.detection_skip || 1, 10);
-                state.fadeIn = parseFloat(config.fade_in || 0);
-                state.fadeOut = parseFloat(config.fade_out || 0);
-                applyTheme(config.theme || 'dark');
-                await loadLanguage(config.lang || 'zh');
-                state.configLoaded = true;
-                addLogEntry(text('logs.init', 'Interface ready.'), 'info');
-                render();
-                await loadComparisonInput();
+                const config = await slayerApi().fetch_ui_state() || {};
+                appState.inputPath = normalizeRuntimePath(config.input_path || '');
+                appState.outputPath = Object.prototype.hasOwnProperty.call(config, 'output_path') ? (normalizeRuntimePath(config.output_path || fallbackOutputPath) || fallbackOutputPath) : fallbackOutputPath;
+                appState.overwrite = Boolean(config.overwrite);
+                appState.transparent = Boolean(config.transparent);
+                appState.detection = Number(config.max_bbox_percent || 100);
+                appState.format = normalizeOutputFormat(config.force_format || 'None');
+                appState.mode = config.mode === 'batch' ? 'batch' : 'single';
+                appState.detectionPrompt = config.detection_prompt || 'watermark';
+                appState.detectionGroup = normalizeClassGroup(config.detection_group || appState.detectionClassConfig.default_group || 'watermark');
+                appState.detectionOutputLabel = config.detection_output_label || (activeClassGroup() && activeClassGroup().output_label) || 'watermark';
+                appState.detectionTask = config.detection_task || (activeClassGroup() && activeClassGroup().task) || 'auto';
+                appState.selectedDetectionClasses = normalizeClassSelection(config.detection_classes || [], activeClassGroup());
+                appState.florenceTest.modelId = Object.prototype.hasOwnProperty.call(config, 'florence_model_id') ? normalizeRuntimePath(config.florence_model_id) : appState.florenceTest.modelId;
+                appState.florenceTest.adapterDir = Object.prototype.hasOwnProperty.call(config, 'florence_adapter_dir') ? normalizeRuntimePath(config.florence_adapter_dir) : appState.florenceTest.adapterDir;
+                appState.florenceTest.maxNewTokens = parseInt(config.florence_max_new_tokens || appState.florenceTest.maxNewTokens, 10);
+                appState.florenceTest.numBeams = parseInt(config.florence_num_beams || appState.florenceTest.numBeams, 10);
+                appState.florenceTest.useFastProcessor = config.florence_use_fast_processor !== false;
+                appState.detectionSkip = parseInt(config.detection_skip || 1, 10);
+                appState.fadeIn = parseFloat(config.fade_in || 0);
+                appState.fadeOut = parseFloat(config.fade_out || 0);
+                applyThemeChoice(config.theme || 'dark');
+                await loadLanguagePack(config.lang || 'zh');
+                appState.configLoaded = true;
+                appendLogLine(text('logs.init', 'Interface ready.'), 'info');
+                renderApp();
+                await loadSourceMedia();
                 return true;
             } catch (error) {
                 console.log('Config load failed:', error);
@@ -751,7 +751,7 @@
             }
         }
 
-        function waitForBackendConfig() {
+        function waitForBridgeState() {
             return new Promise(resolve => {
                 let done = false;
                 const finish = value => {
@@ -761,10 +761,10 @@
                     }
                 };
                 const attempt = async () => {
-                    const loaded = await loadBackendConfig();
+                    const loaded = await restoreBridgeState();
                     if (loaded) finish(true);
                 };
-                if (api()) {
+                if (slayerApi()) {
                     attempt();
                 } else {
                     window.addEventListener('pywebviewready', attempt, { once: true });
@@ -773,7 +773,7 @@
             });
         }
 
-        function bindElements() {
+        function cacheDom() {
             [
                 'appVersion', 'themeSelect', 'langSelect', 'modeSingle', 'modeBatch',
                 'inputPath', 'outputPath', 'browseInput', 'browseOutput',
@@ -796,395 +796,395 @@
                 'previewSource', 'previewDetections', 'previewGeneratedText',
                 'previewRawPredictions', 'rerunPreview'
             ].forEach(id => {
-                el[id] = document.getElementById(id);
+                dom[id] = document.getElementById(id);
             });
         }
 
-        function bindEvents() {
-            el.themeSelect.addEventListener('change', () => {
-                applyTheme(el.themeSelect.value);
-                saveConfigDebounced();
+        function wireEvents() {
+            dom.themeSelect.addEventListener('change', () => {
+                applyThemeChoice(dom.themeSelect.value);
+                queueBridgeStateSave();
             });
-            el.langSelect.addEventListener('change', async () => {
-                await loadLanguage(el.langSelect.value);
-                saveConfigDebounced();
+            dom.langSelect.addEventListener('change', async () => {
+                await loadLanguagePack(dom.langSelect.value);
+                queueBridgeStateSave();
             });
 
-            el.modeSingle.addEventListener('click', () => setMode('single'));
-            el.modeBatch.addEventListener('click', () => setMode('batch'));
+            dom.modeSingle.addEventListener('click', () => setInputMode('single'));
+            dom.modeBatch.addEventListener('click', () => setInputMode('batch'));
 
-            el.inputPath.addEventListener('input', () => {
-                state.inputPath = toUbuntuPath(el.inputPath.value);
-                state.compare.after = null;
-                state.compare.outputPath = '';
-                state.compare.status = 'waiting';
-                saveConfigDebounced();
-                render();
-                loadComparisonInput();
+            dom.inputPath.addEventListener('input', () => {
+                appState.inputPath = normalizeRuntimePath(dom.inputPath.value);
+                appState.compare.after = null;
+                appState.compare.outputPath = '';
+                appState.compare.status = 'waiting';
+                queueBridgeStateSave();
+                renderApp();
+                loadSourceMedia();
             });
-            el.outputPath.addEventListener('input', () => {
-                state.outputPath = toUbuntuPath(el.outputPath.value);
-                saveConfigDebounced();
+            dom.outputPath.addEventListener('input', () => {
+                appState.outputPath = normalizeRuntimePath(dom.outputPath.value);
+                queueBridgeStateSave();
             });
-            el.browseInput.addEventListener('click', browseInput);
-            el.browseOutput.addEventListener('click', browseOutput);
-            el.stageBrowse.addEventListener('click', browseInput);
-            el.dropZone.addEventListener('click', browseInput);
-            el.dropZone.addEventListener('keydown', event => {
+            dom.browseInput.addEventListener('click', chooseInputPath);
+            dom.browseOutput.addEventListener('click', chooseOutputPath);
+            dom.stageBrowse.addEventListener('click', chooseInputPath);
+            dom.dropZone.addEventListener('click', chooseInputPath);
+            dom.dropZone.addEventListener('keydown', event => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    browseInput();
+                    chooseInputPath();
                 }
             });
-            el.dropZone.addEventListener('dragover', event => {
+            dom.dropZone.addEventListener('dragover', event => {
                 event.preventDefault();
-                el.dropZone.classList.add('dragging');
+                dom.dropZone.classList.add('dragging');
             });
-            el.dropZone.addEventListener('dragleave', () => el.dropZone.classList.remove('dragging'));
-            el.dropZone.addEventListener('drop', event => {
+            dom.dropZone.addEventListener('dragleave', () => dom.dropZone.classList.remove('dragging'));
+            dom.dropZone.addEventListener('drop', event => {
                 event.preventDefault();
-                el.dropZone.classList.remove('dragging');
+                dom.dropZone.classList.remove('dragging');
                 const file = event.dataTransfer.files && event.dataTransfer.files[0];
                 if (file && file.path) {
-                    state.inputPath = toUbuntuPath(file.path);
-                    saveConfigDebounced();
-                    render();
+                    appState.inputPath = normalizeRuntimePath(file.path);
+                    queueBridgeStateSave();
+                    renderApp();
                 }
             });
 
-            el.overwriteToggle.addEventListener('change', () => {
-                state.overwrite = el.overwriteToggle.checked;
-                saveConfigDebounced();
+            dom.overwriteToggle.addEventListener('change', () => {
+                appState.overwrite = dom.overwriteToggle.checked;
+                queueBridgeStateSave();
             });
-            el.transparentToggle.addEventListener('change', () => {
-                state.transparent = el.transparentToggle.checked;
-                saveConfigDebounced();
-                render();
+            dom.transparentToggle.addEventListener('change', () => {
+                appState.transparent = dom.transparentToggle.checked;
+                queueBridgeStateSave();
+                renderApp();
             });
-            el.detectionRange.addEventListener('input', () => {
-                state.detection = parseInt(el.detectionRange.value, 10);
-                render();
+            dom.detectionRange.addEventListener('input', () => {
+                appState.detection = parseInt(dom.detectionRange.value, 10);
+                renderApp();
             });
-            el.detectionRange.addEventListener('change', saveConfigDebounced);
-            el.detectionPrompt.addEventListener('input', () => {
-                state.detectionPrompt = el.detectionPrompt.value;
-                saveConfigDebounced();
+            dom.detectionRange.addEventListener('change', queueBridgeStateSave);
+            dom.detectionPrompt.addEventListener('input', () => {
+                appState.detectionPrompt = dom.detectionPrompt.value;
+                queueBridgeStateSave();
             });
-            el.classGroupSelect.addEventListener('change', () => {
-                state.detectionGroup = normalizeDetectionGroup(el.classGroupSelect.value);
-                const group = currentClassGroup();
-                state.detectionOutputLabel = group ? (group.output_label || group.id) : 'watermark';
-                state.detectionTask = group ? (group.task || 'auto') : 'auto';
-                state.selectedDetectionClasses = normalizeSelectedClasses([], group);
-                saveConfigDebounced();
-                render();
+            dom.classGroupSelect.addEventListener('change', () => {
+                appState.detectionGroup = normalizeClassGroup(dom.classGroupSelect.value);
+                const group = activeClassGroup();
+                appState.detectionOutputLabel = group ? (group.output_label || group.id) : 'watermark';
+                appState.detectionTask = group ? (group.task || 'auto') : 'auto';
+                appState.selectedDetectionClasses = normalizeClassSelection([], group);
+                queueBridgeStateSave();
+                renderApp();
             });
-            el.formatSelect.addEventListener('change', () => {
-                state.format = normalizeFormat(el.formatSelect.value);
-                saveConfigDebounced();
+            dom.formatSelect.addEventListener('change', () => {
+                appState.format = normalizeOutputFormat(dom.formatSelect.value);
+                queueBridgeStateSave();
             });
-            el.detectionSkip.addEventListener('input', () => {
-                state.detectionSkip = parseInt(el.detectionSkip.value, 10);
-                render();
+            dom.detectionSkip.addEventListener('input', () => {
+                appState.detectionSkip = parseInt(dom.detectionSkip.value, 10);
+                renderApp();
             });
-            el.detectionSkip.addEventListener('change', saveConfigDebounced);
-            el.fadeIn.addEventListener('input', () => {
-                state.fadeIn = parseFloat(el.fadeIn.value);
-                render();
+            dom.detectionSkip.addEventListener('change', queueBridgeStateSave);
+            dom.fadeIn.addEventListener('input', () => {
+                appState.fadeIn = parseFloat(dom.fadeIn.value);
+                renderApp();
             });
-            el.fadeIn.addEventListener('change', saveConfigDebounced);
-            el.fadeOut.addEventListener('input', () => {
-                state.fadeOut = parseFloat(el.fadeOut.value);
-                render();
+            dom.fadeIn.addEventListener('change', queueBridgeStateSave);
+            dom.fadeOut.addEventListener('input', () => {
+                appState.fadeOut = parseFloat(dom.fadeOut.value);
+                renderApp();
             });
-            el.fadeOut.addEventListener('change', saveConfigDebounced);
+            dom.fadeOut.addEventListener('change', queueBridgeStateSave);
 
-            el.startButton.addEventListener('click', startProcessing);
-            el.stopButton.addEventListener('click', stopProcessing);
-            el.previewButton.addEventListener('click', runPreview);
-            el.rerunPreview.addEventListener('click', runPreview);
-            el.browseFlorenceModel.addEventListener('click', () => browseFlorenceFolder('modelId'));
-            el.browseFlorenceAdapter.addEventListener('click', () => browseFlorenceFolder('adapterDir'));
-            el.florenceModelId.addEventListener('input', () => { state.florenceTest.modelId = toUbuntuPath(el.florenceModelId.value); saveConfigDebounced(); });
-            el.florenceAdapterDir.addEventListener('input', () => { state.florenceTest.adapterDir = toUbuntuPath(el.florenceAdapterDir.value); saveConfigDebounced(); });
-            el.florenceMaxTokens.addEventListener('input', () => { state.florenceTest.maxNewTokens = parseInt(el.florenceMaxTokens.value, 10) || 256; saveConfigDebounced(); });
-            el.florenceNumBeams.addEventListener('input', () => { state.florenceTest.numBeams = parseInt(el.florenceNumBeams.value, 10) || 3; saveConfigDebounced(); });
-            el.florenceUseFastProcessor.addEventListener('change', () => { state.florenceTest.useFastProcessor = el.florenceUseFastProcessor.checked; saveConfigDebounced(); });
-            el.comparePlayPause.addEventListener('click', toggleComparePlayback);
-            el.compareSpeed.addEventListener('change', () => {
-                state.compare.speed = parseFloat(el.compareSpeed.value) || 1;
-                applyCompareSpeed();
+            dom.startButton.addEventListener('click', launchProcessing);
+            dom.stopButton.addEventListener('click', haltProcessing);
+            dom.previewButton.addEventListener('click', launchPreview);
+            dom.rerunPreview.addEventListener('click', launchPreview);
+            dom.browseFlorenceModel.addEventListener('click', () => chooseFlorencePath('modelId'));
+            dom.browseFlorenceAdapter.addEventListener('click', () => chooseFlorencePath('adapterDir'));
+            dom.florenceModelId.addEventListener('input', () => { appState.florenceTest.modelId = normalizeRuntimePath(dom.florenceModelId.value); queueBridgeStateSave(); });
+            dom.florenceAdapterDir.addEventListener('input', () => { appState.florenceTest.adapterDir = normalizeRuntimePath(dom.florenceAdapterDir.value); queueBridgeStateSave(); });
+            dom.florenceMaxTokens.addEventListener('input', () => { appState.florenceTest.maxNewTokens = parseInt(dom.florenceMaxTokens.value, 10) || 256; queueBridgeStateSave(); });
+            dom.florenceNumBeams.addEventListener('input', () => { appState.florenceTest.numBeams = parseInt(dom.florenceNumBeams.value, 10) || 3; queueBridgeStateSave(); });
+            dom.florenceUseFastProcessor.addEventListener('change', () => { appState.florenceTest.useFastProcessor = dom.florenceUseFastProcessor.checked; queueBridgeStateSave(); });
+            dom.comparePlayPause.addEventListener('click', togglePlayback);
+            dom.compareSpeed.addEventListener('change', () => {
+                appState.compare.speed = parseFloat(dom.compareSpeed.value) || 1;
+                applyPlaybackRate();
             });
-            el.compareTimeline.addEventListener('input', () => seekCompareFromSlider());
-            el.compareBeforeVideo.addEventListener('timeupdate', syncCompareTimeline);
-            el.compareAfterVideo.addEventListener('timeupdate', syncCompareTimeline);
-            el.closePreview.addEventListener('click', closePreview);
-            el.closePreviewFooter.addEventListener('click', closePreview);
-            el.previewModal.addEventListener('click', event => {
-                if (event.target === el.previewModal) closePreview();
+            dom.compareTimeline.addEventListener('input', () => seekComparison());
+            dom.compareBeforeVideo.addEventListener('timeupdate', syncPlaybackTimeline);
+            dom.compareAfterVideo.addEventListener('timeupdate', syncPlaybackTimeline);
+            dom.closePreview.addEventListener('click', hidePreviewDialog);
+            dom.closePreviewFooter.addEventListener('click', hidePreviewDialog);
+            dom.previewModal.addEventListener('click', event => {
+                if (event.target === dom.previewModal) hidePreviewDialog();
             });
-            el.clearLogs.addEventListener('click', () => {
-                state.logs = [];
-                renderLogs();
+            dom.clearLogs.addEventListener('click', () => {
+                appState.logs = [];
+                renderLogPanel();
             });
         }
 
-        function setMode(mode) {
-            state.mode = mode === 'batch' ? 'batch' : 'single';
-            saveConfigDebounced();
-            render();
+        function setInputMode(mode) {
+            appState.mode = mode === 'batch' ? 'batch' : 'single';
+            queueBridgeStateSave();
+            renderApp();
         }
 
-        async function browseInput() {
-            if (!api()) {
-                addLogEntry(text('logs.api_error'), 'error');
+        async function chooseInputPath() {
+            if (!slayerApi()) {
+                appendLogLine(text('logs.api_error'), 'error');
                 return;
             }
             try {
-                const path = state.mode === 'single'
-                    ? await api().browse_file()
-                    : await api().browse_folder();
+                const path = appState.mode === 'single'
+                    ? await slayerApi().choose_media_file()
+                    : await slayerApi().choose_directory();
                 if (path) {
-                    state.inputPath = toUbuntuPath(path);
-                    state.compare.after = null;
-                    state.compare.outputPath = '';
-                    state.compare.status = 'waiting';
-                    saveConfigDebounced();
-                    render();
-                    await loadComparisonInput();
+                    appState.inputPath = normalizeRuntimePath(path);
+                    appState.compare.after = null;
+                    appState.compare.outputPath = '';
+                    appState.compare.status = 'waiting';
+                    queueBridgeStateSave();
+                    renderApp();
+                    await loadSourceMedia();
                 }
             } catch (error) {
-                addLogEntry(error.message, 'error');
+                appendLogLine(error.message, 'error');
             }
         }
 
-        async function browseOutput() {
-            if (!api()) {
-                addLogEntry(text('logs.api_error'), 'error');
+        async function chooseOutputPath() {
+            if (!slayerApi()) {
+                appendLogLine(text('logs.api_error'), 'error');
                 return;
             }
             try {
-                const path = await api().browse_folder();
+                const path = await slayerApi().choose_directory();
                 if (path) {
-                    state.outputPath = toUbuntuPath(path);
-                    saveConfigDebounced();
-                    render();
+                    appState.outputPath = normalizeRuntimePath(path);
+                    queueBridgeStateSave();
+                    renderApp();
                 }
             } catch (error) {
-                addLogEntry(error.message, 'error');
+                appendLogLine(error.message, 'error');
             }
         }
 
-        async function browseFlorenceFolder(key) {
-            if (!api()) {
-                addLogEntry(text('logs.api_error'), 'error');
+        async function chooseFlorencePath(key) {
+            if (!slayerApi()) {
+                appendLogLine(text('logs.api_error'), 'error');
                 return;
             }
             try {
-                const path = await api().browse_folder();
+                const path = await slayerApi().choose_directory();
                 if (path) {
-                    state.florenceTest[key] = toUbuntuPath(path);
-                    saveConfigDebounced();
-                    renderModelSettings();
+                    appState.florenceTest[key] = normalizeRuntimePath(path);
+                    queueBridgeStateSave();
+                    renderDetectorSettings();
                 }
             } catch (error) {
-                addLogEntry(error.message, 'error');
+                appendLogLine(error.message, 'error');
             }
         }
 
-        async function startProcessing() {
-            state.inputPath = toUbuntuPath(state.inputPath);
-            state.outputPath = toUbuntuPath(state.outputPath) || defaultOutputPath;
-            state.florenceTest.modelId = toUbuntuPath(state.florenceTest.modelId);
-            state.florenceTest.adapterDir = toUbuntuPath(state.florenceTest.adapterDir);
+        async function launchProcessing() {
+            appState.inputPath = normalizeRuntimePath(appState.inputPath);
+            appState.outputPath = normalizeRuntimePath(appState.outputPath) || fallbackOutputPath;
+            appState.florenceTest.modelId = normalizeRuntimePath(appState.florenceTest.modelId);
+            appState.florenceTest.adapterDir = normalizeRuntimePath(appState.florenceTest.adapterDir);
 
-            if (!state.inputPath) {
-                addLogEntry(text('logs.no_input'), 'error');
+            if (!appState.inputPath) {
+                appendLogLine(text('logs.no_input'), 'error');
                 return;
             }
-            if (!api()) {
-                addLogEntry(text('logs.api_error'), 'error');
+            if (!slayerApi()) {
+                appendLogLine(text('logs.api_error'), 'error');
                 return;
             }
-            if (isVideoFile(state.inputPath) && state.transparent) {
-                state.transparent = false;
-                addLogEntry(text('logs.ghost_video_warning'), 'warning');
+            if (pathIsVideo(appState.inputPath) && appState.transparent) {
+                appState.transparent = false;
+                appendLogLine(text('logs.ghost_video_warning'), 'warning');
             }
-            if (isVideoFile(state.inputPath) && !state.systemInfo.ffmpeg) {
-                addLogEntry(text('logs.no_ffmpeg'), 'warning');
+            if (pathIsVideo(appState.inputPath) && !appState.systemInfo.ffmpeg) {
+                appendLogLine(text('logs.no_ffmpeg'), 'warning');
             }
 
-            state.processing = true;
-            state.progress = 0;
-            state.statusMsg = text('processing_status.0', text('logs.cooking'));
-            state.compare.status = 'processing';
-            state.compare.outputPath = '';
-            addLogEntry(text('logs.starting'), 'info');
-            addLogEntry(text('logs.first_run_hint'), 'muted');
-            startStatusTicker();
-            render();
+            appState.processing = true;
+            appState.progress = 0;
+            appState.statusMsg = text('processing_status.0', text('logs.cooking'));
+            appState.compare.status = 'processing';
+            appState.compare.outputPath = '';
+            appendLogLine(text('logs.starting'), 'info');
+            appendLogLine(text('logs.first_run_hint'), 'muted');
+            beginStatusTicker();
+            renderApp();
 
             try {
-                await loadComparisonInput();
-                await prepareDetectionComparison();
-                const result = await api().start_processing({
-                    input: toUbuntuPath(state.inputPath),
-                    output: toUbuntuPath(state.outputPath),
-                    overwrite: state.overwrite,
-                    transparent: state.transparent,
-                    max_bbox: state.detection,
-                    format: state.format,
-                    mode: state.mode,
-                    detection_prompt: state.detectionPrompt || 'watermark',
-                    detection_group: state.detectionGroup,
-                    detection_classes: state.selectedDetectionClasses,
-                    detection_output_label: state.detectionOutputLabel || 'watermark',
-                    detection_task: state.detectionTask || 'auto',
-                    florence_model_id: toUbuntuPath(state.florenceTest.modelId),
-                    florence_adapter_dir: toUbuntuPath(state.florenceTest.adapterDir),
-                    florence_max_new_tokens: parseInt(state.florenceTest.maxNewTokens, 10) || 256,
-                    florence_num_beams: parseInt(state.florenceTest.numBeams, 10) || 3,
-                    florence_use_fast_processor: state.florenceTest.useFastProcessor,
-                    detection_skip: parseInt(state.detectionSkip, 10) || 1,
-                    fade_in: parseFloat(state.fadeIn) || 0,
-                    fade_out: parseFloat(state.fadeOut) || 0,
-                    theme: state.theme,
-                    lang: state.lang
+                await loadSourceMedia();
+                await prepareDetectionPane();
+                const result = await slayerApi().launch_slayer_job({
+                    input: normalizeRuntimePath(appState.inputPath),
+                    output: normalizeRuntimePath(appState.outputPath),
+                    overwrite: appState.overwrite,
+                    transparent: appState.transparent,
+                    max_bbox: appState.detection,
+                    format: appState.format,
+                    mode: appState.mode,
+                    detection_prompt: appState.detectionPrompt || 'watermark',
+                    detection_group: appState.detectionGroup,
+                    detection_classes: appState.selectedDetectionClasses,
+                    detection_output_label: appState.detectionOutputLabel || 'watermark',
+                    detection_task: appState.detectionTask || 'auto',
+                    florence_model_id: normalizeRuntimePath(appState.florenceTest.modelId),
+                    florence_adapter_dir: normalizeRuntimePath(appState.florenceTest.adapterDir),
+                    florence_max_new_tokens: parseInt(appState.florenceTest.maxNewTokens, 10) || 256,
+                    florence_num_beams: parseInt(appState.florenceTest.numBeams, 10) || 3,
+                    florence_use_fast_processor: appState.florenceTest.useFastProcessor,
+                    detection_skip: parseInt(appState.detectionSkip, 10) || 1,
+                    fade_in: parseFloat(appState.fadeIn) || 0,
+                    fade_out: parseFloat(appState.fadeOut) || 0,
+                    theme: appState.theme,
+                    lang: appState.lang
                 });
                 if (result && result.error) {
-                    addLogEntry(result.error, 'error');
-                    state.processing = false;
-                    stopStatusTicker();
-                    render();
+                    appendLogLine(result.error, 'error');
+                    appState.processing = false;
+                    endStatusTicker();
+                    renderApp();
                 }
             } catch (error) {
-                addLogEntry(error.message, 'error');
-                state.processing = false;
-                stopStatusTicker();
-                render();
+                appendLogLine(error.message, 'error');
+                appState.processing = false;
+                endStatusTicker();
+                renderApp();
             }
         }
 
-        async function stopProcessing() {
-            if (api()) {
+        async function haltProcessing() {
+            if (slayerApi()) {
                 try {
-                    await api().stop_processing();
+                    await slayerApi().halt_slayer_job();
                 } catch (error) {
-                    addLogEntry(error.message, 'error');
+                    appendLogLine(error.message, 'error');
                 }
             }
-            state.processing = false;
-            stopStatusTicker();
-            addLogEntry(text('logs.stopped'), 'warning');
-            render();
+            appState.processing = false;
+            endStatusTicker();
+            appendLogLine(text('logs.stopped'), 'warning');
+            renderApp();
         }
 
-        async function runPreview() {
-            state.inputPath = toUbuntuPath(state.inputPath);
-            state.florenceTest.modelId = toUbuntuPath(state.florenceTest.modelId);
-            state.florenceTest.adapterDir = toUbuntuPath(state.florenceTest.adapterDir);
+        async function launchPreview() {
+            appState.inputPath = normalizeRuntimePath(appState.inputPath);
+            appState.florenceTest.modelId = normalizeRuntimePath(appState.florenceTest.modelId);
+            appState.florenceTest.adapterDir = normalizeRuntimePath(appState.florenceTest.adapterDir);
 
-            if (!state.inputPath) {
-                addLogEntry(text('logs.no_input'), 'error');
+            if (!appState.inputPath) {
+                appendLogLine(text('logs.no_input'), 'error');
                 return;
             }
-            if (!api()) {
-                addLogEntry(text('logs.api_error'), 'error');
+            if (!slayerApi()) {
+                appendLogLine(text('logs.api_error'), 'error');
                 return;
             }
 
-            state.preview.loading = true;
-            state.preview.error = '';
-            state.preview.image = '';
-            state.preview.detections = [];
-            state.preview.generatedText = '';
-            state.preview.predictionsRaw = [];
-            state.preview.parsed = null;
-            openPreview();
-            renderPreview();
+            appState.preview.loading = true;
+            appState.preview.error = '';
+            appState.preview.image = '';
+            appState.preview.detections = [];
+            appState.preview.generatedText = '';
+            appState.preview.predictionsRaw = [];
+            appState.preview.parsed = null;
+            showPreviewDialog();
+            renderPreviewDialog();
 
             try {
-                const result = await api().preview_detection({
-                    input: toUbuntuPath(state.inputPath),
-                    detection_prompt: state.detectionPrompt || 'watermark',
-                    detection_group: state.detectionGroup,
-                    detection_classes: state.selectedDetectionClasses,
-                    detection_output_label: state.detectionOutputLabel || 'watermark',
-                    detection_task: state.detectionTask || 'auto',
-                    florence_model_id: toUbuntuPath(state.florenceTest.modelId),
-                    florence_adapter_dir: toUbuntuPath(state.florenceTest.adapterDir),
-                    florence_max_new_tokens: parseInt(state.florenceTest.maxNewTokens, 10) || 256,
-                    florence_num_beams: parseInt(state.florenceTest.numBeams, 10) || 3,
-                    florence_use_fast_processor: state.florenceTest.useFastProcessor,
-                    max_bbox: state.detection
+                const result = await slayerApi().preview_slayer_detection({
+                    input: normalizeRuntimePath(appState.inputPath),
+                    detection_prompt: appState.detectionPrompt || 'watermark',
+                    detection_group: appState.detectionGroup,
+                    detection_classes: appState.selectedDetectionClasses,
+                    detection_output_label: appState.detectionOutputLabel || 'watermark',
+                    detection_task: appState.detectionTask || 'auto',
+                    florence_model_id: normalizeRuntimePath(appState.florenceTest.modelId),
+                    florence_adapter_dir: normalizeRuntimePath(appState.florenceTest.adapterDir),
+                    florence_max_new_tokens: parseInt(appState.florenceTest.maxNewTokens, 10) || 256,
+                    florence_num_beams: parseInt(appState.florenceTest.numBeams, 10) || 3,
+                    florence_use_fast_processor: appState.florenceTest.useFastProcessor,
+                    max_bbox: appState.detection
                 });
                 if (result.error) {
-                    state.preview.error = result.error;
-                    addLogEntry(`${text('logs.preview_failed')} ${result.error}`, 'error');
+                    appState.preview.error = result.error;
+                    appendLogLine(`${text('logs.preview_failed')} ${result.error}`, 'error');
                 } else {
-                    state.preview.image = result.image;
-                    state.preview.detections = result.detections || [];
-                    state.preview.generatedText = result.generated_text || '';
-                    state.preview.predictionsRaw = result.predictions_raw || [];
-                    state.preview.parsed = result.parsed || null;
-                    const rawClasses = result.raw_classes || state.selectedDetectionClasses || [];
-                    state.preview.prompt = rawClasses.length
-                        ? `${rawClasses.join(', ')} -> ${result.output_label || state.detectionOutputLabel || 'watermark'}`
-                        : (result.prompt_used || state.detectionPrompt);
-                    state.preview.source = result.source || state.inputPath;
-                    const accepted = state.preview.detections.filter(item => item.accepted).length;
-                    const total = state.preview.detections.length;
-                    addLogEntry(text('logs.preview_result').replace('{total}', total).replace('{accepted}', accepted), 'info');
+                    appState.preview.image = result.image;
+                    appState.preview.detections = result.detections || [];
+                    appState.preview.generatedText = result.generated_text || '';
+                    appState.preview.predictionsRaw = result.predictions_raw || [];
+                    appState.preview.parsed = result.parsed || null;
+                    const rawClasses = result.raw_classes || appState.selectedDetectionClasses || [];
+                    appState.preview.prompt = rawClasses.length
+                        ? `${rawClasses.join(', ')} -> ${result.output_label || appState.detectionOutputLabel || 'watermark'}`
+                        : (result.prompt_used || appState.detectionPrompt);
+                    appState.preview.source = result.source || appState.inputPath;
+                    const accepted = appState.preview.detections.filter(item => item.accepted).length;
+                    const total = appState.preview.detections.length;
+                    appendLogLine(text('logs.preview_result').replace('{total}', total).replace('{accepted}', accepted), 'info');
                 }
             } catch (error) {
-                state.preview.error = error.message;
-                addLogEntry(`${text('logs.preview_failed')} ${error.message}`, 'error');
+                appState.preview.error = error.message;
+                appendLogLine(`${text('logs.preview_failed')} ${error.message}`, 'error');
             } finally {
-                state.preview.loading = false;
-                renderPreview();
+                appState.preview.loading = false;
+                renderPreviewDialog();
             }
         }
 
-        function openPreview() {
-            setHidden(el.previewModal, false);
+        function showPreviewDialog() {
+            toggleHidden(dom.previewModal, false);
         }
 
-        function closePreview() {
-            setHidden(el.previewModal, true);
+        function hidePreviewDialog() {
+            toggleHidden(dom.previewModal, true);
         }
 
-        function startStatusTicker() {
-            stopStatusTicker();
-            state.statusTimer = setInterval(() => {
-                const items = Array.isArray(state.t.processing_status) ? state.t.processing_status : fallbackText.processing_status;
-                if (state.processing && items.length) {
-                    state.statusMsg = items[Math.floor(Math.random() * items.length)];
-                    renderProgress();
+        function beginStatusTicker() {
+            endStatusTicker();
+            appState.statusTimer = setInterval(() => {
+                const items = Array.isArray(appState.t.processing_status) ? appState.t.processing_status : defaultCopy.processing_status;
+                if (appState.processing && items.length) {
+                    appState.statusMsg = items[Math.floor(Math.random() * items.length)];
+                    renderProgressState();
                 }
             }, 2500);
         }
 
-        function stopStatusTicker() {
-            if (state.statusTimer) {
-                clearInterval(state.statusTimer);
-                state.statusTimer = null;
+        function endStatusTicker() {
+            if (appState.statusTimer) {
+                clearInterval(appState.statusTimer);
+                appState.statusTimer = null;
             }
         }
 
-        function addLogEntry(message, color = 'muted') {
-            const type = normalizeLogType(color);
+        function appendLogLine(message, color = 'muted') {
+            const type = logTypeForColor(color);
             const now = new Date();
-            state.logs.push({
-                id: state.logSeq++,
+            appState.logs.push({
+                id: appState.logSeq++,
                 time: now.toTimeString().slice(0, 8),
                 message,
                 type
             });
-            if (state.logs.length > 150) state.logs = state.logs.slice(-150);
-            renderLogs();
+            if (appState.logs.length > 150) appState.logs = appState.logs.slice(-150);
+            renderLogPanel();
         }
 
-        function normalizeLogType(color) {
+        function logTypeForColor(color) {
             const value = String(color || '').toLowerCase();
             if (value.includes('error') || value.includes('failed')) return 'error';
             if (value.includes('warning') || value.includes('yellow')) return 'warning';
@@ -1193,88 +1193,88 @@
             return 'muted';
         }
 
-        function render() {
-            el.themeSelect.value = state.theme;
-            el.langSelect.value = state.lang;
-            el.inputPath.value = toUbuntuPath(state.inputPath);
-            el.outputPath.value = toUbuntuPath(state.outputPath);
-            el.overwriteToggle.checked = state.overwrite;
-            el.transparentToggle.checked = state.transparent;
-            el.detectionRange.value = state.detection;
-            el.detectionValue.textContent = `${state.detection}%`;
-            el.detectionPrompt.value = state.detectionPrompt;
-            renderClassMapping();
-            el.formatSelect.value = state.format;
-            el.detectionSkip.value = state.detectionSkip;
-            el.detectionSkipValue.textContent = state.detectionSkip;
-            el.fadeIn.value = state.fadeIn;
-            el.fadeInValue.textContent = Number(state.fadeIn).toFixed(1).replace('.0', '');
-            el.fadeOut.value = state.fadeOut;
-            el.fadeOutValue.textContent = Number(state.fadeOut).toFixed(1).replace('.0', '');
+        function renderApp() {
+            dom.themeSelect.value = appState.theme;
+            dom.langSelect.value = appState.lang;
+            dom.inputPath.value = normalizeRuntimePath(appState.inputPath);
+            dom.outputPath.value = normalizeRuntimePath(appState.outputPath);
+            dom.overwriteToggle.checked = appState.overwrite;
+            dom.transparentToggle.checked = appState.transparent;
+            dom.detectionRange.value = appState.detection;
+            dom.detectionValue.textContent = `${appState.detection}%`;
+            dom.detectionPrompt.value = appState.detectionPrompt;
+            renderClassSelectors();
+            dom.formatSelect.value = appState.format;
+            dom.detectionSkip.value = appState.detectionSkip;
+            dom.detectionSkipValue.textContent = appState.detectionSkip;
+            dom.fadeIn.value = appState.fadeIn;
+            dom.fadeInValue.textContent = Number(appState.fadeIn).toFixed(1).replace('.0', '');
+            dom.fadeOut.value = appState.fadeOut;
+            dom.fadeOutValue.textContent = Number(appState.fadeOut).toFixed(1).replace('.0', '');
 
-            el.modeSingle.classList.toggle('active', state.mode === 'single');
-            el.modeBatch.classList.toggle('active', state.mode === 'batch');
-            setHidden(el.videoPanel, !isVideoFile(state.inputPath));
+            dom.modeSingle.classList.toggle('active', appState.mode === 'single');
+            dom.modeBatch.classList.toggle('active', appState.mode === 'batch');
+            toggleHidden(dom.videoPanel, !pathIsVideo(appState.inputPath));
 
-            el.startButton.disabled = state.processing || !state.inputPath;
-            el.stopButton.disabled = !state.processing;
-            el.previewButton.disabled = state.processing || !state.inputPath;
-            el.startButton.textContent = state.processing ? text('buttons.start_processing') : text('buttons.start');
+            dom.startButton.disabled = appState.processing || !appState.inputPath;
+            dom.stopButton.disabled = !appState.processing;
+            dom.previewButton.disabled = appState.processing || !appState.inputPath;
+            dom.startButton.textContent = appState.processing ? text('buttons.start_processing') : text('buttons.start');
 
-            renderSelectedInput();
-            renderModelSettings();
-            renderComparison();
-            renderProgress();
-            renderSystem();
-            renderPreview();
+            renderSourceSummary();
+            renderDetectorSettings();
+            renderComparisonPane();
+            renderProgressState();
+            renderSystemState();
+            renderPreviewDialog();
         }
 
-        function renderSelectedInput() {
-            const path = toUbuntuPath(state.inputPath);
-            el.pathDisplay.textContent = displayPath(path);
+        function renderSourceSummary() {
+            const path = normalizeRuntimePath(appState.inputPath);
+            dom.pathDisplay.textContent = formatPathLabel(path);
             if (!path) {
-                el.selectedTitle.textContent = text('dropzone.title');
-                el.selectedSubtitle.textContent = text('dropzone.subtitle');
-                el.fileKind.textContent = text('labels.ready');
+                dom.selectedTitle.textContent = text('dropzone.title');
+                dom.selectedSubtitle.textContent = text('dropzone.subtitle');
+                dom.fileKind.textContent = text('labels.ready');
                 return;
             }
-            el.selectedTitle.textContent = path.split(/[\\/]/).pop() || path;
-            el.selectedSubtitle.textContent = path;
-            if (isVideoFile(path)) {
-                el.fileKind.textContent = text('dropzone.video_hint');
-            } else if (isImageFile(path)) {
-                el.fileKind.textContent = text('dropzone.image_hint');
+            dom.selectedTitle.textContent = path.split(/[\\/]/).pop() || path;
+            dom.selectedSubtitle.textContent = path;
+            if (pathIsVideo(path)) {
+                dom.fileKind.textContent = text('dropzone.video_hint');
+            } else if (pathIsImage(path)) {
+                dom.fileKind.textContent = text('dropzone.image_hint');
             } else {
-                el.fileKind.textContent = state.mode === 'batch' ? text('dropzone.folder_hint') : text('labels.ready');
+                dom.fileKind.textContent = appState.mode === 'batch' ? text('dropzone.folder_hint') : text('labels.ready');
             }
         }
 
-        function renderClassMapping() {
-            const group = currentClassGroup();
-            el.classGroupSelect.value = state.detectionGroup;
-            el.classCheckboxes.innerHTML = '';
+        function renderClassSelectors() {
+            const group = activeClassGroup();
+            dom.classGroupSelect.value = appState.detectionGroup;
+            dom.classCheckboxes.innerHTML = '';
 
             if (!group) {
-                el.classGroupDescription.textContent = text('classes.empty');
-                el.classOutputLabel.textContent = 'watermark';
+                dom.classGroupDescription.textContent = text('classes.empty');
+                dom.classOutputLabel.textContent = 'watermark';
                 return;
             }
 
-            state.detectionOutputLabel = group.output_label || group.id || 'watermark';
-            state.detectionTask = group.task || state.detectionTask || 'auto';
-            el.classOutputLabel.textContent = state.detectionOutputLabel;
-            el.classGroupDescription.textContent = localizedValue(group, 'description') || text('classes.hint');
+            appState.detectionOutputLabel = group.output_label || group.id || 'watermark';
+            appState.detectionTask = group.task || appState.detectionTask || 'auto';
+            dom.classOutputLabel.textContent = appState.detectionOutputLabel;
+            dom.classGroupDescription.textContent = localizedClassValue(group, 'description') || text('classes.hint');
 
             const classes = Array.isArray(group.classes) ? group.classes : [];
             if (!classes.length) {
-                el.classCheckboxes.textContent = text('classes.empty');
+                dom.classCheckboxes.textContent = text('classes.empty');
                 return;
             }
 
-            const selected = new Set(state.selectedDetectionClasses);
+            const selected = new Set(appState.selectedDetectionClasses);
             classes.forEach(item => {
                 const classId = item.id || item;
-                const label = localizedValue(item, 'name') || classId;
+                const label = localizedClassValue(item, 'name') || classId;
                 const row = document.createElement('label');
                 row.className = 'class-chip';
                 row.innerHTML = '<input type="checkbox"><span></span><code></code>';
@@ -1283,29 +1283,29 @@
                 row.querySelector('span').textContent = label;
                 row.querySelector('code').textContent = classId;
                 checkbox.addEventListener('change', () => {
-                    const next = new Set(state.selectedDetectionClasses);
+                    const next = new Set(appState.selectedDetectionClasses);
                     if (checkbox.checked) {
                         next.add(classId);
                     } else {
                         next.delete(classId);
                     }
-                    state.selectedDetectionClasses = classIds(group).filter(id => next.has(id));
-                    saveConfigDebounced();
-                    renderClassMapping();
+                    appState.selectedDetectionClasses = classGroupIds(group).filter(id => next.has(id));
+                    queueBridgeStateSave();
+                    renderClassSelectors();
                 });
-                el.classCheckboxes.appendChild(row);
+                dom.classCheckboxes.appendChild(row);
             });
         }
 
-        function renderModelSettings() {
-            el.florenceModelId.value = toUbuntuPath(state.florenceTest.modelId);
-            el.florenceAdapterDir.value = toUbuntuPath(state.florenceTest.adapterDir);
-            el.florenceMaxTokens.value = state.florenceTest.maxNewTokens;
-            el.florenceNumBeams.value = state.florenceTest.numBeams;
-            el.florenceUseFastProcessor.checked = state.florenceTest.useFastProcessor;
+        function renderDetectorSettings() {
+            dom.florenceModelId.value = normalizeRuntimePath(appState.florenceTest.modelId);
+            dom.florenceAdapterDir.value = normalizeRuntimePath(appState.florenceTest.adapterDir);
+            dom.florenceMaxTokens.value = appState.florenceTest.maxNewTokens;
+            dom.florenceNumBeams.value = appState.florenceTest.numBeams;
+            dom.florenceUseFastProcessor.checked = appState.florenceTest.useFastProcessor;
         }
 
-        function mediaSrc(media) {
+        function mediaSourceUrl(media) {
             if (!media) return '';
             if (media.kind === 'image' && media.data) {
                 return media.data_url || `data:${media.mime || 'image/png'};base64,${media.data}`;
@@ -1317,14 +1317,14 @@
             return '';
         }
 
-        function renderMedia(media, imgEl, videoEl, emptyEl) {
-            const src = mediaSrc(media);
+        function renderMediaPane(media, imgEl, videoEl, emptyEl) {
+            const src = mediaSourceUrl(media);
             const isImage = media && media.kind === 'image' && src;
             const isVideo = media && media.kind === 'video' && src;
 
-            setHidden(imgEl, !isImage);
-            setHidden(videoEl, !isVideo);
-            setHidden(emptyEl, Boolean(isImage || isVideo));
+            toggleHidden(imgEl, !isImage);
+            toggleHidden(videoEl, !isVideo);
+            toggleHidden(emptyEl, Boolean(isImage || isVideo));
 
             if (isImage) {
                 imgEl.onerror = () => {
@@ -1346,308 +1346,308 @@
             }
         }
 
-        function renderComparison() {
-            const before = state.compare.before;
-            const after = state.compare.after;
-            renderMedia(before, el.compareBeforeImage, el.compareBeforeVideo, el.compareBeforeEmpty);
-            renderMedia(after, el.compareAfterImage, el.compareAfterVideo, el.compareAfterEmpty);
+        function renderComparisonPane() {
+            const before = appState.compare.before;
+            const after = appState.compare.after;
+            renderMediaPane(before, dom.compareBeforeImage, dom.compareBeforeVideo, dom.compareBeforeEmpty);
+            renderMediaPane(after, dom.compareAfterImage, dom.compareAfterVideo, dom.compareAfterEmpty);
 
-            el.compareBeforeName.textContent = before ? (before.name || displayPath(before.path)) : '-';
-            el.compareAfterName.textContent = after ? (after.name || displayPath(after.path)) : '-';
+            dom.compareBeforeName.textContent = before ? (before.name || formatPathLabel(before.path)) : '-';
+            dom.compareAfterName.textContent = after ? (after.name || formatPathLabel(after.path)) : '-';
 
-            const statusKey = state.compare.status === 'detecting' ? 'detecting' : (state.processing ? 'processing' : state.compare.status);
-            el.compareStatus.textContent = text(`compare.${statusKey}`, text('compare.waiting'));
+            const statusKey = appState.compare.status === 'detecting' ? 'detecting' : (appState.processing ? 'processing' : appState.compare.status);
+            dom.compareStatus.textContent = text(`compare.${statusKey}`, text('compare.waiting'));
 
             const videoReady = before && after && before.kind === 'video' && after.kind === 'video';
-            el.comparePlayPause.disabled = !videoReady;
-            el.compareTimeline.disabled = !videoReady;
-            el.compareSpeed.disabled = !videoReady;
-            el.comparePlayPause.textContent = state.compare.playing ? text('compare.pause') : text('compare.play');
-            el.compareTimeline.value = state.compare.timeline;
-            el.compareSpeed.value = String(state.compare.speed);
+            dom.comparePlayPause.disabled = !videoReady;
+            dom.compareTimeline.disabled = !videoReady;
+            dom.compareSpeed.disabled = !videoReady;
+            dom.comparePlayPause.textContent = appState.compare.playing ? text('compare.pause') : text('compare.play');
+            dom.compareTimeline.value = appState.compare.timeline;
+            dom.compareSpeed.value = String(appState.compare.speed);
         }
 
-        async function loadComparisonInput() {
-            state.inputPath = toUbuntuPath(state.inputPath);
-            if (!api() || !state.inputPath || (!isImageFile(state.inputPath) && !isVideoFile(state.inputPath))) {
-                state.compare.before = null;
-                renderComparison();
+        async function loadSourceMedia() {
+            appState.inputPath = normalizeRuntimePath(appState.inputPath);
+            if (!slayerApi() || !appState.inputPath || (!pathIsImage(appState.inputPath) && !pathIsVideo(appState.inputPath))) {
+                appState.compare.before = null;
+                renderComparisonPane();
                 return;
             }
             try {
-                const media = await api().get_media(state.inputPath);
+                const media = await slayerApi().fetch_media_payload(appState.inputPath);
                 if (!media.error) {
-                    state.compare.before = media;
+                    appState.compare.before = media;
                 } else {
-                    addLogEntry(media.error, 'warning');
+                    appendLogLine(media.error, 'warning');
                 }
             } catch (error) {
-                addLogEntry(error.message, 'warning');
+                appendLogLine(error.message, 'warning');
             }
-            renderComparison();
+            renderComparisonPane();
         }
 
-        async function prepareDetectionComparison() {
-            state.inputPath = toUbuntuPath(state.inputPath);
-            state.florenceTest.modelId = toUbuntuPath(state.florenceTest.modelId);
-            state.florenceTest.adapterDir = toUbuntuPath(state.florenceTest.adapterDir);
-            if (!api() || !state.inputPath || (!isImageFile(state.inputPath) && !isVideoFile(state.inputPath))) return;
+        async function prepareDetectionPane() {
+            appState.inputPath = normalizeRuntimePath(appState.inputPath);
+            appState.florenceTest.modelId = normalizeRuntimePath(appState.florenceTest.modelId);
+            appState.florenceTest.adapterDir = normalizeRuntimePath(appState.florenceTest.adapterDir);
+            if (!slayerApi() || !appState.inputPath || (!pathIsImage(appState.inputPath) && !pathIsVideo(appState.inputPath))) return;
 
-            state.compare.status = 'detecting';
-            state.compare.after = null;
-            renderComparison();
+            appState.compare.status = 'detecting';
+            appState.compare.after = null;
+            renderComparisonPane();
 
             try {
-                const result = await api().preview_detection({
-                    input: toUbuntuPath(state.inputPath),
-                    detection_prompt: state.detectionPrompt || 'watermark',
-                    detection_group: state.detectionGroup,
-                    detection_classes: state.selectedDetectionClasses,
-                    detection_output_label: state.detectionOutputLabel || 'watermark',
-                    detection_task: state.detectionTask || 'auto',
-                    florence_model_id: toUbuntuPath(state.florenceTest.modelId),
-                    florence_adapter_dir: toUbuntuPath(state.florenceTest.adapterDir),
-                    florence_max_new_tokens: parseInt(state.florenceTest.maxNewTokens, 10) || 256,
-                    florence_num_beams: parseInt(state.florenceTest.numBeams, 10) || 3,
-                    florence_use_fast_processor: state.florenceTest.useFastProcessor,
-                    max_bbox: state.detection
+                const result = await slayerApi().preview_slayer_detection({
+                    input: normalizeRuntimePath(appState.inputPath),
+                    detection_prompt: appState.detectionPrompt || 'watermark',
+                    detection_group: appState.detectionGroup,
+                    detection_classes: appState.selectedDetectionClasses,
+                    detection_output_label: appState.detectionOutputLabel || 'watermark',
+                    detection_task: appState.detectionTask || 'auto',
+                    florence_model_id: normalizeRuntimePath(appState.florenceTest.modelId),
+                    florence_adapter_dir: normalizeRuntimePath(appState.florenceTest.adapterDir),
+                    florence_max_new_tokens: parseInt(appState.florenceTest.maxNewTokens, 10) || 256,
+                    florence_num_beams: parseInt(appState.florenceTest.numBeams, 10) || 3,
+                    florence_use_fast_processor: appState.florenceTest.useFastProcessor,
+                    max_bbox: appState.detection
                 });
                 if (!result.error && result.image) {
-                    state.compare.after = {
+                    appState.compare.after = {
                         kind: 'image',
                         mime: 'image/png',
                         data: result.image,
                         name: text('compare.detecting'),
-                        path: result.source || state.inputPath
+                        path: result.source || appState.inputPath
                     };
-                    state.compare.status = 'processing';
+                    appState.compare.status = 'processing';
                 } else if (result.error) {
-                    addLogEntry(`${text('logs.preview_failed')} ${result.error}`, 'warning');
-                    state.compare.status = 'processing';
+                    appendLogLine(`${text('logs.preview_failed')} ${result.error}`, 'warning');
+                    appState.compare.status = 'processing';
                 }
             } catch (error) {
-                addLogEntry(`${text('logs.preview_failed')} ${error.message}`, 'warning');
-                state.compare.status = 'processing';
+                appendLogLine(`${text('logs.preview_failed')} ${error.message}`, 'warning');
+                appState.compare.status = 'processing';
             }
-            renderComparison();
+            renderComparisonPane();
         }
 
-        function handleProcessingOutput(media) {
+        function applyProcessedMedia(media) {
             if (!media || media.error) return;
-            media.path = toUbuntuPath(media.path || '');
-            state.compare.after = media;
-            state.compare.outputPath = media.path || '';
-            state.compare.status = 'done';
-            state.compare.timeline = 0;
-            state.compare.playing = false;
-            renderComparison();
-            applyCompareSpeed();
+            media.path = normalizeRuntimePath(media.path || '');
+            appState.compare.after = media;
+            appState.compare.outputPath = media.path || '';
+            appState.compare.status = 'done';
+            appState.compare.timeline = 0;
+            appState.compare.playing = false;
+            renderComparisonPane();
+            applyPlaybackRate();
         }
 
-        function compareDuration() {
-            const before = el.compareBeforeVideo;
-            const after = el.compareAfterVideo;
+        function comparisonDuration() {
+            const before = dom.compareBeforeVideo;
+            const after = dom.compareAfterVideo;
             const durations = [before.duration, after.duration].filter(value => Number.isFinite(value) && value > 0);
             return durations.length ? Math.min(...durations) : 0;
         }
 
-        function applyCompareSpeed() {
-            const speed = parseFloat(state.compare.speed) || 1;
-            el.compareBeforeVideo.playbackRate = speed;
-            el.compareAfterVideo.playbackRate = speed;
+        function applyPlaybackRate() {
+            const speed = parseFloat(appState.compare.speed) || 1;
+            dom.compareBeforeVideo.playbackRate = speed;
+            dom.compareAfterVideo.playbackRate = speed;
         }
 
-        function toggleComparePlayback() {
-            const before = el.compareBeforeVideo;
-            const after = el.compareAfterVideo;
-            if (!(state.compare.before && state.compare.after && state.compare.before.kind === 'video' && state.compare.after.kind === 'video')) return;
+        function togglePlayback() {
+            const before = dom.compareBeforeVideo;
+            const after = dom.compareAfterVideo;
+            if (!(appState.compare.before && appState.compare.after && appState.compare.before.kind === 'video' && appState.compare.after.kind === 'video')) return;
 
-            applyCompareSpeed();
-            if (state.compare.playing) {
+            applyPlaybackRate();
+            if (appState.compare.playing) {
                 before.pause();
                 after.pause();
-                state.compare.playing = false;
+                appState.compare.playing = false;
             } else {
                 const targetTime = before.currentTime || after.currentTime || 0;
                 before.currentTime = targetTime;
                 after.currentTime = targetTime;
                 Promise.allSettled([before.play(), after.play()]);
-                state.compare.playing = true;
+                appState.compare.playing = true;
             }
-            renderComparison();
+            renderComparisonPane();
         }
 
-        function seekCompareFromSlider() {
-            state.compare.timeline = parseInt(el.compareTimeline.value, 10) || 0;
-            const duration = compareDuration();
+        function seekComparison() {
+            appState.compare.timeline = parseInt(dom.compareTimeline.value, 10) || 0;
+            const duration = comparisonDuration();
             if (!duration) return;
-            const targetTime = duration * (state.compare.timeline / 1000);
-            el.compareBeforeVideo.currentTime = targetTime;
-            el.compareAfterVideo.currentTime = targetTime;
+            const targetTime = duration * (appState.compare.timeline / 1000);
+            dom.compareBeforeVideo.currentTime = targetTime;
+            dom.compareAfterVideo.currentTime = targetTime;
         }
 
-        function syncCompareTimeline() {
-            const duration = compareDuration();
-            if (!duration || document.activeElement === el.compareTimeline) return;
-            state.compare.timeline = Math.round((el.compareBeforeVideo.currentTime / duration) * 1000);
-            el.compareTimeline.value = state.compare.timeline;
+        function syncPlaybackTimeline() {
+            const duration = comparisonDuration();
+            if (!duration || document.activeElement === dom.compareTimeline) return;
+            appState.compare.timeline = Math.round((dom.compareBeforeVideo.currentTime / duration) * 1000);
+            dom.compareTimeline.value = appState.compare.timeline;
         }
 
-        function renderProgress() {
-            const progress = Math.max(0, Math.min(100, Number(state.progress || 0)));
-            el.progressFill.style.width = `${progress}%`;
-            el.progressValue.textContent = `${progress}%`;
-            el.statusText.textContent = state.processing ? text('logs.cooking') : text('labels.idle');
-            el.statusMessage.textContent = state.statusMsg || text('labels.ready');
+        function renderProgressState() {
+            const progress = Math.max(0, Math.min(100, Number(appState.progress || 0)));
+            dom.progressFill.style.width = `${progress}%`;
+            dom.progressValue.textContent = `${progress}%`;
+            dom.statusText.textContent = appState.processing ? text('logs.cooking') : text('labels.idle');
+            dom.statusMessage.textContent = appState.statusMsg || text('labels.ready');
         }
 
-        function renderSystem() {
-            el.cudaState.textContent = state.systemInfo.cuda ? text('status_bar.on') : text('status_bar.off');
-            el.cudaState.className = state.systemInfo.cuda ? 'ok' : 'warn';
-            el.ffmpegState.textContent = state.systemInfo.ffmpeg ? text('status_bar.on') : text('status_bar.off');
-            el.ffmpegState.className = state.systemInfo.ffmpeg ? 'ok' : 'warn';
-            el.ramState.textContent = state.systemInfo.ram ? `${Math.round(state.systemInfo.ram)}%` : '--';
-            el.gpuState.textContent = state.systemInfo.gpu || text('status_bar.cpu_mode');
+        function renderSystemState() {
+            dom.cudaState.textContent = appState.systemInfo.cuda ? text('status_bar.on') : text('status_bar.off');
+            dom.cudaState.className = appState.systemInfo.cuda ? 'ok' : 'warn';
+            dom.ffmpegState.textContent = appState.systemInfo.ffmpeg ? text('status_bar.on') : text('status_bar.off');
+            dom.ffmpegState.className = appState.systemInfo.ffmpeg ? 'ok' : 'warn';
+            dom.ramState.textContent = appState.systemInfo.ram ? `${Math.round(appState.systemInfo.ram)}%` : '--';
+            dom.gpuState.textContent = appState.systemInfo.gpu || text('status_bar.cpu_mode');
         }
 
-        function renderLogs() {
-            el.logs.innerHTML = '';
-            state.logs.forEach(item => {
+        function renderLogPanel() {
+            dom.logs.innerHTML = '';
+            appState.logs.forEach(item => {
                 const row = document.createElement('div');
                 row.className = `log-row ${item.type}`;
                 row.innerHTML = `<span>${item.time}</span><p></p>`;
                 row.querySelector('p').textContent = item.message;
-                el.logs.appendChild(row);
+                dom.logs.appendChild(row);
             });
-            el.logs.scrollTop = el.logs.scrollHeight;
+            dom.logs.scrollTop = dom.logs.scrollHeight;
         }
 
-        function renderPreview() {
-            setHidden(el.previewLoading, !state.preview.loading);
-            setHidden(el.previewError, !state.preview.error);
-            setHidden(el.previewImage, !state.preview.image);
+        function renderPreviewDialog() {
+            toggleHidden(dom.previewLoading, !appState.preview.loading);
+            toggleHidden(dom.previewError, !appState.preview.error);
+            toggleHidden(dom.previewImage, !appState.preview.image);
 
-            if (state.preview.error) {
-                el.previewError.textContent = state.preview.error;
+            if (appState.preview.error) {
+                dom.previewError.textContent = appState.preview.error;
             }
-            if (state.preview.image) {
-                el.previewImage.src = `data:image/png;base64,${state.preview.image}`;
+            if (appState.preview.image) {
+                dom.previewImage.src = `data:image/png;base64,${appState.preview.image}`;
             }
 
-            el.previewPrompt.textContent = state.preview.prompt || state.detectionPrompt || '-';
-            el.previewCount.textContent = state.preview.detections.length;
-            el.previewSource.textContent = state.preview.source || state.inputPath || '-';
-            el.previewDetections.innerHTML = '';
-            el.previewGeneratedText.textContent = state.preview.generatedText || '';
-            el.previewRawPredictions.textContent = JSON.stringify({
-                predictions_raw: state.preview.predictionsRaw || [],
-                parsed: state.preview.parsed
+            dom.previewPrompt.textContent = appState.preview.prompt || appState.detectionPrompt || '-';
+            dom.previewCount.textContent = appState.preview.detections.length;
+            dom.previewSource.textContent = appState.preview.source || appState.inputPath || '-';
+            dom.previewDetections.innerHTML = '';
+            dom.previewGeneratedText.textContent = appState.preview.generatedText || '';
+            dom.previewRawPredictions.textContent = JSON.stringify({
+                predictions_raw: appState.preview.predictionsRaw || [],
+                parsed: appState.preview.parsed
             }, null, 2);
 
-            state.preview.detections.forEach((det, index) => {
+            appState.preview.detections.forEach((det, index) => {
                 const row = document.createElement('div');
                 row.className = `bbox-row ${det.accepted ? 'accepted' : 'skipped'}`;
                 const area = typeof det.area_percent === 'number' ? det.area_percent : '-';
                 row.innerHTML = `
                     <span>#${index + 1}</span>
                     <code>${Array.isArray(det.bbox) ? det.bbox.join(', ') : '-'}</code>
-                    <strong>${det.raw_label || det.query_label || '-'} -> ${det.output_label || state.detectionOutputLabel || 'watermark'}</strong>
+                    <strong>${det.raw_label || det.query_label || '-'} -> ${det.output_label || appState.detectionOutputLabel || 'watermark'}</strong>
                     <strong>${area}${text('preview_modal.of_image')}</strong>
                     <em></em>
                 `;
                 row.querySelector('em').textContent = det.accepted ? text('status_bar.on') : text('preview_modal.too_large');
-                el.previewDetections.appendChild(row);
+                dom.previewDetections.appendChild(row);
             });
         }
 
-        async function loadStaticInfo() {
-            if (!api()) {
-                setTimeout(loadStaticInfo, 800);
+        async function loadCapabilityInfo() {
+            if (!slayerApi()) {
+                setTimeout(loadCapabilityInfo, 800);
                 return;
             }
             try {
-                const info = await api().get_static_info();
-                state.systemInfo.cuda = Boolean(info.cuda);
-                state.systemInfo.gpu = info.gpu_name || text('status_bar.cpu_mode');
-                state.systemInfo.ffmpeg = Boolean(info.ffmpeg);
-                renderSystem();
+                const info = await slayerApi().fetch_capability_snapshot();
+                appState.systemInfo.cuda = Boolean(info.cuda);
+                appState.systemInfo.gpu = info.gpu_name || text('status_bar.cpu_mode');
+                appState.systemInfo.ffmpeg = Boolean(info.ffmpeg);
+                renderSystemState();
             } catch (error) {
-                setTimeout(loadStaticInfo, 1000);
+                setTimeout(loadCapabilityInfo, 1000);
             }
         }
 
-        async function updateDynamicInfo() {
-            if (!api()) return;
+        async function updateResourceInfo() {
+            if (!slayerApi()) return;
             try {
-                const info = await api().get_dynamic_info();
-                state.systemInfo.ram = Number(info.ram_percent || 0);
-                renderSystem();
+                const info = await slayerApi().fetch_usage_snapshot();
+                appState.systemInfo.ram = Number(info.ram_percent || 0);
+                renderSystemState();
             } catch (error) {
                 // Dynamic info is optional.
             }
         }
 
-        function exposePythonCallbacks() {
+        function registerBridgeCallbacks() {
             window.updateProgress = percent => {
-                state.progress = parseInt(percent, 10) || 0;
-                if (state.compare.before && state.compare.before.kind === 'video' && !(state.compare.after && state.compare.after.kind === 'video')) {
-                    state.compare.timeline = Math.max(0, Math.min(1000, Math.round(state.progress * 10)));
-                    el.compareTimeline.value = state.compare.timeline;
-                    if (Number.isFinite(el.compareBeforeVideo.duration) && el.compareBeforeVideo.duration > 0) {
-                        el.compareBeforeVideo.currentTime = el.compareBeforeVideo.duration * (state.progress / 100);
+                appState.progress = parseInt(percent, 10) || 0;
+                if (appState.compare.before && appState.compare.before.kind === 'video' && !(appState.compare.after && appState.compare.after.kind === 'video')) {
+                    appState.compare.timeline = Math.max(0, Math.min(1000, Math.round(appState.progress * 10)));
+                    dom.compareTimeline.value = appState.compare.timeline;
+                    if (Number.isFinite(dom.compareBeforeVideo.duration) && dom.compareBeforeVideo.duration > 0) {
+                        dom.compareBeforeVideo.currentTime = dom.compareBeforeVideo.duration * (appState.progress / 100);
                     }
                 }
-                renderProgress();
+                renderProgressState();
             };
             window.addLog = (message, color) => {
-                addLogEntry(message, color);
+                appendLogLine(message, color);
             };
             window.processingOutput = media => {
-                handleProcessingOutput(media);
+                applyProcessedMedia(media);
             };
             window.processingOutputPath = async path => {
-                path = toUbuntuPath(path);
-                if (!api() || !path) return;
+                path = normalizeRuntimePath(path);
+                if (!slayerApi() || !path) return;
                 try {
-                    const media = await api().get_media(path);
-                    handleProcessingOutput(media);
+                    const media = await slayerApi().fetch_media_payload(path);
+                    applyProcessedMedia(media);
                 } catch (error) {
-                    addLogEntry(error.message, 'warning');
+                    appendLogLine(error.message, 'warning');
                 }
             };
             window.processingComplete = () => {
-                state.processing = false;
-                state.progress = 100;
-                state.compare.status = state.compare.outputPath ? 'done' : 'waiting';
-                state.statusMsg = text('logs.done');
-                stopStatusTicker();
-                addLogEntry(text('logs.done'), 'success');
-                render();
+                appState.processing = false;
+                appState.progress = 100;
+                appState.compare.status = appState.compare.outputPath ? 'done' : 'waiting';
+                appState.statusMsg = text('logs.done');
+                endStatusTicker();
+                appendLogLine(text('logs.done'), 'success');
+                renderApp();
             };
         }
 
-        async function init() {
-            bindElements();
-            exposePythonCallbacks();
-            await loadUiConfig();
-            await loadDetectionClassConfig();
-            bindEvents();
-            applyTheme('dark');
-            await loadLanguage('zh');
+        async function bootApp() {
+            cacheDom();
+            registerBridgeCallbacks();
+            await loadUiManifest();
+            await loadDetectionClassManifest();
+            wireEvents();
+            applyThemeChoice('dark');
+            await loadLanguagePack('zh');
 
-            const loaded = await waitForBackendConfig();
+            const loaded = await waitForBridgeState();
             if (!loaded) {
-                state.configLoaded = false;
-                addLogEntry(text('logs.api_error'), 'warning');
-                render();
+                appState.configLoaded = false;
+                appendLogLine(text('logs.api_error'), 'warning');
+                renderApp();
             }
 
-            loadStaticInfo();
-            updateDynamicInfo();
-            setInterval(updateDynamicInfo, 3000);
+            loadCapabilityInfo();
+            updateResourceInfo();
+            setInterval(updateResourceInfo, 3000);
         }
 
-        document.addEventListener('DOMContentLoaded', init);
+        document.addEventListener('DOMContentLoaded', bootApp);
     </script>
 </body>
 </html>

@@ -34,12 +34,12 @@ import re
 from florence_od_runtime import (
     DEFAULT_ADAPTER_DIR,
     DEFAULT_MODEL_ID,
-    extract_od_predictions,
-    get_first_float_dtype,
-    load_model_and_processor,
-    move_inputs_to_device,
-    normalize_box,
-    sanitize_label,
+    collect_detector_predictions,
+    first_float_dtype,
+    load_detector_stack,
+    move_batch_to_device,
+    clamp_box_to_image,
+    canonical_label,
 )
 
 try:
@@ -48,7 +48,7 @@ except ImportError:
     MatLike = np.ndarray
 
 
-def download_lama_model():
+def fetch_inpaint_model():
     """Download LaMA model using iopaint."""
     logger.info("Downloading LaMA model... (this may take a few minutes)")
     print("Downloading LaMA model (~196MB)... Please wait.")
@@ -68,14 +68,14 @@ def download_lama_model():
     return True
 
 
-def load_lama_model(device):
+def load_inpaint_engine(device):
     """Load LaMA model, downloading if necessary."""
     try:
         return ModelManager(name="lama", device=device)
     except NotImplementedError as e:
         if "Unsupported model: lama" in str(e):
             print("LaMA model not available, attempting to download...")
-            if download_lama_model():
+            if fetch_inpaint_model():
                 # Re-import to refresh model registry
                 import importlib
                 import iopaint.model
@@ -86,15 +86,15 @@ def load_lama_model(device):
                 raise RuntimeError("Failed to download LaMA model. Please run manually: python\\python.exe -m iopaint download --model lama")
         raise
 
-class TaskType(str, Enum):
+class SlayerVisionTask(str, Enum):
     OD = "<OD>"
     """Object detection with labels emitted by the model"""
 
     OPEN_VOCAB_DETECTION = "<OPEN_VOCABULARY_DETECTION>"
     """Detect bounding box for objects and OCR text"""
 
-def run_florence_raw_output(
-    task_prompt: TaskType,
+def run_detector_generation(
+    task_prompt: SlayerVisionTask,
     image: MatLike,
     text_input: str,
     model: Florence2ForConditionalGeneration,
@@ -103,14 +103,14 @@ def run_florence_raw_output(
     max_new_tokens: int = 256,
     num_beams: int = 3,
 ):
-    if not isinstance(task_prompt, TaskType):
-        raise ValueError(f"task_prompt must be a TaskType, but {task_prompt} is of type {type(task_prompt)}")
+    if not isinstance(task_prompt, SlayerVisionTask):
+        raise ValueError(f"task_prompt must be a SlayerVisionTask, but {task_prompt} is of type {type(task_prompt)}")
 
     prompt = task_prompt.value if text_input is None else task_prompt.value + text_input
     inputs = processor(text=prompt, images=image, return_tensors="pt")
     device_obj = device if isinstance(device, torch.device) else torch.device(device)
-    pixel_values_dtype = get_first_float_dtype(model)
-    inputs = move_inputs_to_device(inputs, device_obj, pixel_values_dtype)
+    pixel_values_dtype = first_float_dtype(model)
+    inputs = move_batch_to_device(inputs, device_obj, pixel_values_dtype)
     use_amp = device_obj.type == "cuda" and pixel_values_dtype in (torch.float16, torch.bfloat16)
 
     with torch.inference_mode():
@@ -131,7 +131,7 @@ def run_florence_raw_output(
     parsed = processor.post_process_generation(
         generated_text, task=task_prompt.value, image_size=(image.width, image.height)
     )
-    predictions_raw = extract_od_predictions(parsed, task=task_prompt.value)
+    predictions_raw = collect_detector_predictions(parsed, task=task_prompt.value)
     return {
         "prompt": prompt,
         "task": task_prompt.value,
@@ -141,8 +141,8 @@ def run_florence_raw_output(
     }
 
 
-def identify(
-    task_prompt: TaskType,
+def parse_detector_answer(
+    task_prompt: SlayerVisionTask,
     image: MatLike,
     text_input: str,
     model: Florence2ForConditionalGeneration,
@@ -151,7 +151,7 @@ def identify(
     max_new_tokens: int = 256,
     num_beams: int = 3,
 ):
-    return run_florence_raw_output(
+    return run_detector_generation(
         task_prompt,
         image,
         text_input,
@@ -162,7 +162,7 @@ def identify(
         num_beams,
     )["parsed"]
 
-def parse_detection_classes(detection_classes: str):
+def parse_raw_class_list(detection_classes: str):
     """Parse comma/space separated raw detection labels."""
     if not detection_classes:
         return []
@@ -178,7 +178,7 @@ def parse_detection_classes(detection_classes: str):
     return result
 
 
-def resolve_detection_task(detection_task: str, detection_classes=None):
+def choose_detector_task(detection_task: str, detection_classes=None):
     """Choose Florence task mode.
 
     auto keeps the legacy open-vocabulary path unless raw classes are selected.
@@ -187,20 +187,20 @@ def resolve_detection_task(detection_task: str, detection_classes=None):
     """
     task = (detection_task or "auto").strip().lower()
     if task in {"od", "<od>", "object_detection", "object-detection"}:
-        return TaskType.OD
+        return SlayerVisionTask.OD
     if task in {"open_vocab", "open-vocab", "open_vocabulary", "open-vocabulary", "<open_vocabulary_detection>"}:
-        return TaskType.OPEN_VOCAB_DETECTION
+        return SlayerVisionTask.OPEN_VOCAB_DETECTION
     if detection_classes:
-        return TaskType.OD
-    return TaskType.OPEN_VOCAB_DETECTION
+        return SlayerVisionTask.OD
+    return SlayerVisionTask.OPEN_VOCAB_DETECTION
 
 
-def _detection_targets(detection_prompt: str, detection_classes=None):
+def _iter_detection_queries(detection_prompt: str, detection_classes=None):
     classes = detection_classes or []
     return classes if classes else [detection_prompt or "watermark"]
 
 
-def _raw_predictions_to_detection_items(predictions_raw, image, max_bbox_percent: float, query_label: str, output_label: str, selected_labels=None):
+def _shape_detector_regions(predictions_raw, image, max_bbox_percent: float, query_label: str, output_label: str, selected_labels=None):
     results = []
     image_area = image.width * image.height
     selected_labels = selected_labels or set()
@@ -209,10 +209,10 @@ def _raw_predictions_to_detection_items(predictions_raw, image, max_bbox_percent
         bbox = pred.get("bbox_xyxy", [])
         if len(bbox) != 4:
             continue
-        x1, y1, x2, y2 = [int(round(v)) for v in normalize_box(bbox, image.size)]
+        x1, y1, x2, y2 = [int(round(v)) for v in clamp_box_to_image(bbox, image.size)]
         bbox_area = (x2 - x1) * (y2 - y1)
         area_percent = (bbox_area / image_area) * 100
-        raw_label = sanitize_label(str(pred.get("label") or query_label), fallback=str(query_label))
+        raw_label = canonical_label(str(pred.get("label") or query_label), fallback=str(query_label))
         results.append({
             "bbox": [x1, y1, x2, y2],
             "area_percent": round(area_percent, 2),
@@ -228,17 +228,17 @@ def _raw_predictions_to_detection_items(predictions_raw, image, max_bbox_percent
     return results
 
 
-def _detect_watermark_result(image: MatLike, model: Florence2ForConditionalGeneration, processor: AutoProcessor, device: str, max_bbox_percent: float, detection_prompt: str = "watermark", detection_classes=None, detection_output_label: str = "watermark", detection_task: str = "auto", florence_max_new_tokens: int = 256, florence_num_beams: int = 3):
-    task_prompt = resolve_detection_task(detection_task, detection_classes)
+def _run_region_detection(image: MatLike, model: Florence2ForConditionalGeneration, processor: AutoProcessor, device: str, max_bbox_percent: float, detection_prompt: str = "watermark", detection_classes=None, detection_output_label: str = "watermark", detection_task: str = "auto", florence_max_new_tokens: int = 256, florence_num_beams: int = 3):
+    task_prompt = choose_detector_task(detection_task, detection_classes)
     results = []
     raw_runs = []
-    selected_labels = {sanitize_label(str(label), fallback="") for label in (detection_classes or [])}
+    selected_labels = {canonical_label(str(label), fallback="") for label in (detection_classes or [])}
 
-    if task_prompt == TaskType.OD:
-        raw_output = run_florence_raw_output(task_prompt, image, None, model, processor, device, florence_max_new_tokens, florence_num_beams)
+    if task_prompt == SlayerVisionTask.OD:
+        raw_output = run_detector_generation(task_prompt, image, None, model, processor, device, florence_max_new_tokens, florence_num_beams)
         raw_runs.append(raw_output)
         results.extend(
-            _raw_predictions_to_detection_items(
+            _shape_detector_regions(
                 raw_output["predictions_raw"],
                 image,
                 max_bbox_percent,
@@ -255,11 +255,11 @@ def _detect_watermark_result(image: MatLike, model: Florence2ForConditionalGener
             "predictions_raw": raw_output["predictions_raw"],
         }
 
-    for target in _detection_targets(detection_prompt, detection_classes):
-        raw_output = run_florence_raw_output(task_prompt, image, target, model, processor, device, florence_max_new_tokens, florence_num_beams)
+    for target in _iter_detection_queries(detection_prompt, detection_classes):
+        raw_output = run_detector_generation(task_prompt, image, target, model, processor, device, florence_max_new_tokens, florence_num_beams)
         raw_runs.append(raw_output)
         results.extend(
-            _raw_predictions_to_detection_items(
+            _shape_detector_regions(
                 raw_output["predictions_raw"],
                 image,
                 max_bbox_percent,
@@ -278,8 +278,8 @@ def _detect_watermark_result(image: MatLike, model: Florence2ForConditionalGener
     }
 
 
-def _detect_watermark_items(image: MatLike, model: Florence2ForConditionalGeneration, processor: AutoProcessor, device: str, max_bbox_percent: float, detection_prompt: str = "watermark", detection_classes=None, detection_output_label: str = "watermark", detection_task: str = "auto", florence_max_new_tokens: int = 256, florence_num_beams: int = 3):
-    return _detect_watermark_result(
+def _list_detected_regions(image: MatLike, model: Florence2ForConditionalGeneration, processor: AutoProcessor, device: str, max_bbox_percent: float, detection_prompt: str = "watermark", detection_classes=None, detection_output_label: str = "watermark", detection_task: str = "auto", florence_max_new_tokens: int = 256, florence_num_beams: int = 3):
+    return _run_region_detection(
         image,
         model,
         processor,
@@ -294,7 +294,7 @@ def _detect_watermark_items(image: MatLike, model: Florence2ForConditionalGenera
     )["detections"]
 
 
-def get_watermark_mask(image: MatLike, model: Florence2ForConditionalGeneration, processor: AutoProcessor, device: str, max_bbox_percent: float, detection_prompt: str = "watermark", detection_classes=None, detection_output_label: str = "watermark", detection_task: str = "auto", florence_max_new_tokens: int = 256, florence_num_beams: int = 3):
+def build_region_mask(image: MatLike, model: Florence2ForConditionalGeneration, processor: AutoProcessor, device: str, max_bbox_percent: float, detection_prompt: str = "watermark", detection_classes=None, detection_output_label: str = "watermark", detection_task: str = "auto", florence_max_new_tokens: int = 256, florence_num_beams: int = 3):
     """
     Detect watermarks and create a mask for inpainting.
 
@@ -311,7 +311,7 @@ def get_watermark_mask(image: MatLike, model: Florence2ForConditionalGeneration,
     mask = Image.new("L", image.size, 0)
     draw = ImageDraw.Draw(mask)
 
-    for item in _detect_watermark_items(image, model, processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams):
+    for item in _list_detected_regions(image, model, processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams):
         x1, y1, x2, y2 = item["bbox"]
         if item["accepted"]:
             draw.rectangle([x1, y1, x2, y2], fill=255)
@@ -321,7 +321,7 @@ def get_watermark_mask(image: MatLike, model: Florence2ForConditionalGeneration,
     return mask
 
 
-def detect_only(image: MatLike, model: Florence2ForConditionalGeneration, processor: AutoProcessor, device: str, max_bbox_percent: float, detection_prompt: str = "watermark", detection_classes=None, detection_output_label: str = "watermark", detection_task: str = "auto", florence_max_new_tokens: int = 256, florence_num_beams: int = 3):
+def preview_detected_regions(image: MatLike, model: Florence2ForConditionalGeneration, processor: AutoProcessor, device: str, max_bbox_percent: float, detection_prompt: str = "watermark", detection_classes=None, detection_output_label: str = "watermark", detection_task: str = "auto", florence_max_new_tokens: int = 256, florence_num_beams: int = 3):
     """
     Detect watermarks and return bounding boxes WITHOUT creating mask or inpainting.
     Used for preview mode to show what would be detected.
@@ -329,14 +329,14 @@ def detect_only(image: MatLike, model: Florence2ForConditionalGeneration, proces
     Returns:
         list of dicts with bbox info: [{"bbox": [x1,y1,x2,y2], "area_percent": float, "accepted": bool}, ...]
     """
-    return _detect_watermark_items(image, model, processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
+    return _list_detected_regions(image, model, processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
 
 
-def detect_only_raw(image: MatLike, model: Florence2ForConditionalGeneration, processor: AutoProcessor, device: str, max_bbox_percent: float, detection_prompt: str = "watermark", detection_classes=None, detection_output_label: str = "watermark", detection_task: str = "auto", florence_max_new_tokens: int = 256, florence_num_beams: int = 3):
+def preview_detector_payload(image: MatLike, model: Florence2ForConditionalGeneration, processor: AutoProcessor, device: str, max_bbox_percent: float, detection_prompt: str = "watermark", detection_classes=None, detection_output_label: str = "watermark", detection_task: str = "auto", florence_max_new_tokens: int = 256, florence_num_beams: int = 3):
     """Return Florence raw output plus detection items derived from every raw OD box."""
-    return _detect_watermark_result(image, model, processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
+    return _run_region_detection(image, model, processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
 
-def process_image_with_lama(image: MatLike, mask: MatLike, model_manager: ModelManager):
+def inpaint_image_array(image: MatLike, mask: MatLike, model_manager: ModelManager):
     config = Config(
         ldm_steps=50,
         ldm_sampler=LDMSampler.ddim,
@@ -352,7 +352,7 @@ def process_image_with_lama(image: MatLike, mask: MatLike, model_manager: ModelM
 
     return result
 
-def make_region_transparent(image: Image.Image, mask: Image.Image):
+def cut_mask_to_transparency(image: Image.Image, mask: Image.Image):
     image = image.convert("RGBA")
     mask = mask.convert("L")
     transparent_image = Image.new("RGBA", image.size)
@@ -364,12 +364,12 @@ def make_region_transparent(image: Image.Image, mask: Image.Image):
                 transparent_image.putpixel((x, y), image.getpixel((x, y)))
     return transparent_image
 
-def is_video_file(file_path):
+def is_supported_video(file_path):
     """Check if the file is a video based on its extension"""
     video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm']
     return Path(file_path).suffix.lower() in video_extensions
 
-def process_video(input_path, output_path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, detection_prompt="watermark", detection_classes=None, detection_output_label="watermark", detection_task="auto", florence_max_new_tokens=256, florence_num_beams=3, progress_offset=0, progress_scale=100):
+def process_video_framewise(input_path, output_path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, detection_prompt="watermark", detection_classes=None, detection_output_label="watermark", detection_task="auto", florence_max_new_tokens=256, florence_num_beams=3, progress_offset=0, progress_scale=100):
     """Process a video file by extracting frames, removing watermarks, and reconstructing the video"""
     cap = cv2.VideoCapture(str(input_path))
     if not cap.isOpened():
@@ -422,18 +422,18 @@ def process_video(input_path, output_path, florence_model, florence_processor, m
             pil_image = Image.fromarray(frame_rgb)
             
             # Get watermark mask
-            mask_image = get_watermark_mask(pil_image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
+            mask_image = build_region_mask(pil_image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
             
             # Process frame
             if transparent:
                 # For video, we can't use transparency, so we'll fill with a color or background
-                result_image = make_region_transparent(pil_image, mask_image)
+                result_image = cut_mask_to_transparency(pil_image, mask_image)
                 # Convert RGBA to RGB by filling transparent areas with white
                 background = Image.new("RGB", result_image.size, (255, 255, 255))
                 background.paste(result_image, mask=result_image.split()[3])
                 result_image = background
             else:
-                lama_result = process_image_with_lama(np.array(pil_image), np.array(mask_image), model_manager)
+                lama_result = inpaint_image_array(np.array(pil_image), np.array(mask_image), model_manager)
                 result_image = Image.fromarray(cv2.cvtColor(lama_result, cv2.COLOR_BGR2RGB))
             
             # Convert back to OpenCV format and write to output video
@@ -495,7 +495,7 @@ def process_video(input_path, output_path, florence_model, florence_processor, m
     return output_file
 
 
-def process_video_two_pass(input_path, output_path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, detection_prompt="watermark", detection_classes=None, detection_output_label="watermark", detection_task="auto", detection_skip=1, fade_in_sec=0.0, fade_out_sec=0.0, florence_max_new_tokens=256, florence_num_beams=3, progress_offset=0, progress_scale=100):
+def process_video_timeline_passes(input_path, output_path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, detection_prompt="watermark", detection_classes=None, detection_output_label="watermark", detection_task="auto", detection_skip=1, fade_in_sec=0.0, fade_out_sec=0.0, florence_max_new_tokens=256, florence_num_beams=3, progress_offset=0, progress_scale=100):
     """
     Two-pass video processing with frame skip detection and fade in/out handling.
 
@@ -548,7 +548,7 @@ def process_video_two_pass(input_path, output_path, florence_model, florence_pro
                 break
 
             pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            bboxes = detect_only(pil_image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
+            bboxes = preview_detected_regions(pil_image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
 
             if bboxes:
                 accepted_bboxes = [b["bbox"] for b in bboxes if b["accepted"]]
@@ -623,12 +623,12 @@ def process_video_two_pass(input_path, output_path, florence_model, florence_pro
 
                 # Apply inpainting or transparency
                 if transparent:
-                    result_image = make_region_transparent(pil_image, mask)
+                    result_image = cut_mask_to_transparency(pil_image, mask)
                     background = Image.new("RGB", result_image.size, (255, 255, 255))
                     background.paste(result_image, mask=result_image.split()[3])
                     result_image = background
                 else:
-                    lama_result = process_image_with_lama(np.array(pil_image), np.array(mask), model_manager)
+                    lama_result = inpaint_image_array(np.array(pil_image), np.array(mask), model_manager)
                     result_image = Image.fromarray(cv2.cvtColor(lama_result, cv2.COLOR_BGR2RGB))
 
                 frame_result = cv2.cvtColor(np.array(result_image), cv2.COLOR_RGB2BGR)
@@ -683,7 +683,7 @@ def process_video_two_pass(input_path, output_path, florence_model, florence_pro
     return output_file
 
 
-def handle_one(image_path: Path, output_path: Path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt="watermark", detection_classes=None, detection_output_label="watermark", detection_task="auto", detection_skip=1, fade_in=0.0, fade_out=0.0, florence_max_new_tokens=256, florence_num_beams=3, progress_offset=0, progress_scale=100):
+def process_single_asset(image_path: Path, output_path: Path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt="watermark", detection_classes=None, detection_output_label="watermark", detection_task="auto", detection_skip=1, fade_in=0.0, fade_out=0.0, florence_max_new_tokens=256, florence_num_beams=3, progress_offset=0, progress_scale=100):
     # SAFETY: Never overwrite the input file
     if image_path.resolve() == output_path.resolve():
         logger.error(f"Cannot overwrite input file: {image_path}. Choose a different output path.")
@@ -695,22 +695,22 @@ def handle_one(image_path: Path, output_path: Path, florence_model, florence_pro
         return
 
     # Check if it's a video file
-    if is_video_file(image_path):
+    if is_supported_video(image_path):
         # Use two-pass if detection_skip > 1 or fade handling is needed
         use_two_pass = detection_skip > 1 or fade_in > 0 or fade_out > 0
         if use_two_pass:
-            return process_video_two_pass(image_path, output_path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, detection_prompt, detection_classes, detection_output_label, detection_task, detection_skip, fade_in, fade_out, florence_max_new_tokens, florence_num_beams, progress_offset, progress_scale)
+            return process_video_timeline_passes(image_path, output_path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, detection_prompt, detection_classes, detection_output_label, detection_task, detection_skip, fade_in, fade_out, florence_max_new_tokens, florence_num_beams, progress_offset, progress_scale)
         else:
-            return process_video(image_path, output_path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams, progress_offset, progress_scale)
+            return process_video_framewise(image_path, output_path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams, progress_offset, progress_scale)
 
     # Process image
     image = Image.open(image_path).convert("RGB")
-    mask_image = get_watermark_mask(image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
+    mask_image = build_region_mask(image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt, detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
 
     if transparent:
-        result_image = make_region_transparent(image, mask_image)
+        result_image = cut_mask_to_transparency(image, mask_image)
     else:
-        lama_result = process_image_with_lama(np.array(image), np.array(mask_image), model_manager)
+        lama_result = inpaint_image_array(np.array(image), np.array(mask_image), model_manager)
         result_image = Image.fromarray(cv2.cvtColor(lama_result, cv2.COLOR_BGR2RGB))
 
     # Determine output format
@@ -758,7 +758,7 @@ def handle_one(image_path: Path, output_path: Path, florence_model, florence_pro
 @click.option("--detection-skip", default=1, type=int, help="Detect watermarks every N frames for videos (1-10). Higher = faster but may miss brief watermarks.")
 @click.option("--fade-in", default=0.0, type=float, help="Extend mask backwards by N seconds to handle fade-in watermarks.")
 @click.option("--fade-out", default=0.0, type=float, help="Extend mask forwards by N seconds to handle fade-out watermarks.")
-def main(input_path: str, output_path: str, preview: bool, overwrite: bool, transparent: bool, max_bbox_percent: float, force_format: str, detection_prompt: str, detection_classes: str, detection_output_label: str, detection_task: str, florence_model_id: str, florence_adapter_dir: str, florence_max_new_tokens: int, florence_num_beams: int, use_slow_processor: bool, detection_skip: int, fade_in: float, fade_out: float):
+def cli_entry(input_path: str, output_path: str, preview: bool, overwrite: bool, transparent: bool, max_bbox_percent: float, force_format: str, detection_prompt: str, detection_classes: str, detection_output_label: str, detection_task: str, florence_model_id: str, florence_adapter_dir: str, florence_max_new_tokens: int, florence_num_beams: int, use_slow_processor: bool, detection_skip: int, fade_in: float, fade_out: float):
     # Input validation
     if detection_skip < 1 or detection_skip > 10:
         logger.warning(f"detection_skip must be 1-10, got {detection_skip}. Using 1.")
@@ -771,9 +771,9 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
     florence_num_beams = max(1, int(florence_num_beams or 3))
 
     input_path = Path(input_path)
-    raw_detection_classes = parse_detection_classes(detection_classes)
+    raw_detection_classes = parse_raw_class_list(detection_classes)
     detection_output_label = detection_output_label or "watermark"
-    task_type = resolve_detection_task(detection_task, raw_detection_classes)
+    task_type = choose_detector_task(detection_task, raw_detection_classes)
 
     # ========== PREVIEW MODE ==========
     if preview:
@@ -782,7 +782,7 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
         from io import BytesIO
         import random
 
-        florence_model, florence_processor, device, _, load_mode, processor_mode = load_model_and_processor(
+        florence_model, florence_processor, device, _, load_mode, processor_mode = load_detector_stack(
             florence_model_id,
             florence_adapter_dir or None,
             use_fast_processor=not use_slow_processor,
@@ -803,7 +803,7 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
             sample_path = input_path
 
         # Load image (extract frame if video)
-        if is_video_file(sample_path):
+        if is_supported_video(sample_path):
             cap = cv2.VideoCapture(str(sample_path))
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             # Get frame from middle of video
@@ -822,7 +822,7 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
             source_frame = None
 
         # Run detection from Florence raw generation output.
-        detection_result = detect_only_raw(pil_image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt, raw_detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
+        detection_result = preview_detector_payload(pil_image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt, raw_detection_classes, detection_output_label, detection_task, florence_max_new_tokens, florence_num_beams)
         detections = detection_result["detections"]
 
         # Draw bounding boxes on image
@@ -847,7 +847,7 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
             "source": str(sample_path),
             "source_type": source_type,
             "source_frame": source_frame,
-            "prompt_used": task_type.value if task_type == TaskType.OD else detection_prompt,
+            "prompt_used": task_type.value if task_type == SlayerVisionTask.OD else detection_prompt,
             "detection_task": task_type.value,
             "raw_classes": raw_detection_classes,
             "output_label": detection_output_label,
@@ -865,7 +865,7 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
     # ========== NORMAL PROCESSING MODE ==========
     output_path = Path(output_path)
 
-    florence_model, florence_processor, device, _, load_mode, processor_mode = load_model_and_processor(
+    florence_model, florence_processor, device, _, load_mode, processor_mode = load_detector_stack(
         florence_model_id,
         florence_adapter_dir or None,
         use_fast_processor=not use_slow_processor,
@@ -874,7 +874,7 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
     logger.info(f"Florence-2 Model loaded via {load_mode}, processor={processor_mode}")
 
     if not transparent:
-        model_manager = load_lama_model(str(device))
+        model_manager = load_inpaint_engine(str(device))
         logger.info("LaMa model loaded")
     else:
         model_manager = None
@@ -894,7 +894,7 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
             # Calculate progress range for this file
             progress_offset = int(idx / total_files * 100)
             progress_scale = int(100 / total_files)
-            handle_one(file_path, output_file, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt, raw_detection_classes, detection_output_label, detection_task, detection_skip, fade_in, fade_out, florence_max_new_tokens, florence_num_beams, progress_offset, progress_scale)
+            process_single_asset(file_path, output_file, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt, raw_detection_classes, detection_output_label, detection_task, detection_skip, fade_in, fade_out, florence_max_new_tokens, florence_num_beams, progress_offset, progress_scale)
     else:
         # Single file mode - if output is a directory, construct file path
         if output_path.is_dir() or output_path.suffix == "":
@@ -905,15 +905,15 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
             output_file = output_path
 
         # Ensure video output has proper extension
-        if is_video_file(input_path) and output_file.suffix.lower() not in ['.mp4', '.avi', '.mov', '.mkv']:
+        if is_supported_video(input_path) and output_file.suffix.lower() not in ['.mp4', '.avi', '.mov', '.mkv']:
             if force_format and force_format.upper() in ["MP4", "AVI"]:
                 output_file = output_file.with_suffix(f".{force_format.lower()}")
             else:
                 output_file = output_file.with_suffix(".mp4")  # Default to mp4
 
-        result_path = handle_one(input_path, output_file, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt, raw_detection_classes, detection_output_label, detection_task, detection_skip, fade_in, fade_out, florence_max_new_tokens, florence_num_beams)
+        result_path = process_single_asset(input_path, output_file, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt, raw_detection_classes, detection_output_label, detection_task, detection_skip, fade_in, fade_out, florence_max_new_tokens, florence_num_beams)
         final_output = result_path or output_file
         print(f"input_path:{input_path}, output_path:{final_output}, overall_progress:100")
 
 if __name__ == "__main__":
-    main()
+    cli_entry()

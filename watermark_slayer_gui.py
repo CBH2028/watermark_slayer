@@ -6,7 +6,7 @@ PyWebview frontend for the local processing workflow.
 import logging
 
 # Suppress noisy pywebview WebView2 COM warnings (thread safety noise, doesn't affect functionality)
-class PyWebviewFilter(logging.Filter):
+class WebviewNoiseFilter(logging.Filter):
     def filter(self, record):
         msg = record.getMessage()
         # Filter out WebView2 COM interface errors that spam the console
@@ -16,7 +16,7 @@ class PyWebviewFilter(logging.Filter):
             return False
         return True
 
-logging.getLogger('pywebview').addFilter(PyWebviewFilter())
+logging.getLogger('pywebview').addFilter(WebviewNoiseFilter())
 
 import webview
 import threading
@@ -53,7 +53,7 @@ VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm'}
 MEDIA_PREVIEW_MAX_SIDE = 1600
 
 
-def to_ubuntu_path(path):
+def normalize_runtime_path(path):
     """Normalize user-facing paths to Ubuntu/WSL style slash paths."""
     if path is None:
         return ''
@@ -78,7 +78,7 @@ def to_ubuntu_path(path):
     return value
 
 
-def normalize_path_config(config):
+def normalize_config_paths(config):
     """Keep path-like values in ui.yml portable for the Ubuntu runtime."""
     if not isinstance(config, dict):
         return config
@@ -91,59 +91,59 @@ def normalize_path_config(config):
         'florence_adapter_dir',
     ):
         if key in normalized and normalized[key] is not None:
-            normalized[key] = to_ubuntu_path(normalized[key])
+            normalized[key] = normalize_runtime_path(normalized[key])
     return normalized
 
 
-class Api:
+class SlayerBridge:
     """Python API exposed to JavaScript frontend"""
 
     def __init__(self):
-        self.window = None
-        self.process = None
-        self.is_running = False
-        self.config = self._load_config()
+        self._frontend_window = None
+        self._slayer_process = None
+        self._job_active = False
+        self._ui_state = self._read_ui_state()
 
-    def set_window(self, window):
+    def attach_window(self, window):
         """Set the webview window reference"""
-        self.window = window
+        self._frontend_window = window
 
-    def _load_config(self):
+    def _read_ui_state(self):
         """Load saved configuration from YAML file"""
         if os.path.exists(CONFIG_FILE):
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                    return normalize_path_config(yaml.safe_load(f) or {})
+                    return normalize_config_paths(yaml.safe_load(f) or {})
             except Exception:
                 pass
         return {}
 
-    def _save_config(self, config):
+    def _write_ui_state(self, config):
         """Save configuration to YAML file"""
         try:
-            config = normalize_path_config(config)
+            config = normalize_config_paths(config)
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
                 yaml.dump(config, f, default_flow_style=False)
         except Exception as e:
             print(f"Failed to save config: {e}")
 
-    def debug_log(self, msg):
+    def log_frontend_message(self, msg):
         """Print debug message from JavaScript"""
         print(f"[JS DEBUG] {msg}")
 
-    def get_config(self):
+    def fetch_ui_state(self):
         """Return saved configuration to frontend"""
-        self.config = normalize_path_config(self.config)
-        return self.config
+        self._ui_state = normalize_config_paths(self._ui_state)
+        return self._ui_state
 
-    def save_config(self, config):
+    def store_ui_state(self, config):
         """Save configuration from frontend"""
-        self.config = normalize_path_config(config)
-        self._save_config(self.config)
+        self._ui_state = normalize_config_paths(config)
+        self._write_ui_state(self._ui_state)
 
-    def browse_file(self):
+    def choose_media_file(self):
         """Open file browser dialog"""
-        if not self.window:
+        if not self._frontend_window:
             return None
 
         file_types = (
@@ -153,33 +153,33 @@ class Api:
             'All files (*.*)'
         )
 
-        result = self.window.create_file_dialog(
+        result = self._frontend_window.create_file_dialog(
             webview.FileDialog.OPEN,
             file_types=file_types
         )
-        return to_ubuntu_path(result[0]) if result else None
+        return normalize_runtime_path(result[0]) if result else None
 
-    def browse_folder(self):
+    def choose_directory(self):
         """Open folder browser dialog"""
-        if not self.window:
+        if not self._frontend_window:
             return None
 
-        result = self.window.create_file_dialog(webview.FileDialog.FOLDER)
-        return to_ubuntu_path(result[0]) if result else None
+        result = self._frontend_window.create_file_dialog(webview.FileDialog.FOLDER)
+        return normalize_runtime_path(result[0]) if result else None
 
-    def _media_payload(self, path, include_data=True):
+    def _build_media_payload(self, path, include_data=True):
         """Return a browser-displayable payload for an image or video path."""
         if not path:
             return {'error': 'No media path specified'}
 
-        path = to_ubuntu_path(path)
+        path = normalize_runtime_path(path)
         media_path = Path(path).expanduser()
         if not media_path.exists():
             return {'error': f'Media path does not exist: {path}'}
 
         suffix = media_path.suffix.lower()
         payload = {
-            'path': to_ubuntu_path(media_path.resolve()),
+            'path': normalize_runtime_path(media_path.resolve()),
             'name': media_path.name,
             'suffix': suffix,
             'url': media_path.resolve().as_uri(),
@@ -213,14 +213,14 @@ class Api:
 
         return {'error': f'Unsupported media type: {path}'}
 
-    def get_media(self, path):
+    def fetch_media_payload(self, path):
         """Return image base64 or video file URL for comparison UI."""
         try:
-            return self._media_payload(path)
+            return self._build_media_payload(path)
         except Exception as e:
             return {'error': str(e)}
 
-    def _would_overwrite_input(self, input_path, output_path):
+    def _would_clobber_source(self, input_path, output_path):
         """Check if output would overwrite the input file."""
         supported_ext = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm'}
 
@@ -239,7 +239,7 @@ class Api:
             # Directory mode - check if input and output folders are the same
             return os.path.normcase(os.path.abspath(input_path)) == os.path.normcase(os.path.abspath(output_path))
 
-    def _check_file_conflicts(self, input_path, output_path):
+    def _find_output_conflicts(self, input_path, output_path):
         """Check if output files already exist. Returns list of conflicting filenames."""
         conflicts = []
         supported_ext = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm'}
@@ -280,7 +280,7 @@ class Api:
 
         return conflicts
 
-    def get_static_info(self):
+    def fetch_capability_snapshot(self):
         """Get static system info (CUDA, FFmpeg, GPU) - call once on startup"""
         info = {
             'cuda': False,
@@ -314,7 +314,7 @@ class Api:
 
         return info
 
-    def get_dynamic_info(self):
+    def fetch_usage_snapshot(self):
         """Get dynamic system info (RAM, CPU) - call periodically"""
         info = {
             'ram_percent': 0,
@@ -330,13 +330,13 @@ class Api:
 
         return info
 
-    def start_processing(self, settings):
+    def launch_slayer_job(self, settings):
         """Start watermark removal processing"""
-        if self.is_running:
+        if self._job_active:
             return {'error': 'Already running'}
 
-        input_path = to_ubuntu_path(settings.get('input', ''))
-        output_path = to_ubuntu_path(settings.get('output', '')) or DEFAULT_OUTPUT_PATH
+        input_path = normalize_runtime_path(settings.get('input', ''))
+        output_path = normalize_runtime_path(settings.get('output', '')) or DEFAULT_OUTPUT_PATH
 
         if not input_path:
             return {'error': 'No input path specified'}
@@ -347,13 +347,13 @@ class Api:
 
         # SAFETY: Check if output would overwrite input
         overwrite = settings.get('overwrite', False)
-        would_overwrite_input = self._would_overwrite_input(input_path, output_path)
+        would_overwrite_input = self._would_clobber_source(input_path, output_path)
         if would_overwrite_input:
             return {'error': 'Cannot overwrite input file! Choose a different output folder.'}
 
         # Check for file conflicts if overwrite is not enabled
         if not overwrite:
-            conflicts = self._check_file_conflicts(input_path, output_path)
+            conflicts = self._find_output_conflicts(input_path, output_path)
             if conflicts:
                 conflict_list = ', '.join(conflicts[:3])
                 more = f" (+{len(conflicts)-3} more)" if len(conflicts) > 3 else ""
@@ -369,8 +369,8 @@ class Api:
             detection_classes_arg = ','.join([str(item).strip() for item in detection_classes if str(item).strip()])
         detection_output_label = settings.get('detection_output_label', 'watermark')
         detection_task = settings.get('detection_task', 'auto')
-        florence_model_id = to_ubuntu_path(settings.get('florence_model_id', DEFAULT_FLORENCE_MODEL_ID))
-        florence_adapter_dir = to_ubuntu_path(settings.get('florence_adapter_dir', DEFAULT_FLORENCE_ADAPTER_DIR))
+        florence_model_id = normalize_runtime_path(settings.get('florence_model_id', DEFAULT_FLORENCE_MODEL_ID))
+        florence_adapter_dir = normalize_runtime_path(settings.get('florence_adapter_dir', DEFAULT_FLORENCE_ADAPTER_DIR))
         florence_max_new_tokens = int(settings.get('florence_max_new_tokens', DEFAULT_FLORENCE_MAX_NEW_TOKENS) or DEFAULT_FLORENCE_MAX_NEW_TOKENS)
         florence_num_beams = int(settings.get('florence_num_beams', DEFAULT_FLORENCE_NUM_BEAMS) or DEFAULT_FLORENCE_NUM_BEAMS)
         florence_use_fast_processor = bool(settings.get('florence_use_fast_processor', True))
@@ -379,7 +379,7 @@ class Api:
         fade_out = settings.get('fade_out', 0)
 
         # Save config
-        self.save_config({
+        self.store_ui_state({
             'input_path': input_path,
             'output_path': output_path,
             'overwrite': settings.get('overwrite', False),
@@ -446,18 +446,18 @@ class Api:
             cmd.append(f'--fade-out={float(fade_out)}')
 
         # Start processing in background thread
-        self.is_running = True
-        threading.Thread(target=self._run_process, args=(cmd,), daemon=True).start()
+        self._job_active = True
+        threading.Thread(target=self._stream_worker, args=(cmd,), daemon=True).start()
         return {'status': 'started'}
 
-    def _run_process(self, cmd):
+    def _stream_worker(self, cmd):
         """Run the subprocess and stream output to frontend"""
         try:
             # Log the CLI command for educational purposes
             cli_display = ' '.join(cmd[1:])  # Skip python executable
             cli_display = cli_display.replace('watermark_slayer.py ', 'python watermark_slayer.py \\\n    ')
             cli_display = cli_display.replace(' --', ' \\\n    --')
-            self._call_js(f'addLog("$ {json.dumps(cli_display)[1:-1]}", "text-info")')
+            self._send_frontend_event(f'addLog("$ {json.dumps(cli_display)[1:-1]}", "text-info")')
 
             env = os.environ.copy()
             env['PYTHONUNBUFFERED'] = '1'
@@ -467,11 +467,11 @@ class Api:
 
             # Verify script exists
             if not os.path.exists(script_path):
-                self._call_js(f'addLog("ERROR: watermark_slayer.py not found at {json.dumps(script_path)}", "text-error")')
-                self._call_js('processingComplete()')
+                self._send_frontend_event(f'addLog("ERROR: watermark_slayer.py not found at {json.dumps(script_path)}", "text-error")')
+                self._send_frontend_event('processingComplete()')
                 return
 
-            self.process = subprocess.Popen(
+            self._slayer_process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -481,8 +481,8 @@ class Api:
                 cwd=working_dir
             )
 
-            for line in iter(self.process.stdout.readline, ''):
-                if not self.is_running:
+            for line in iter(self._slayer_process.stdout.readline, ''):
+                if not self._job_active:
                     break
 
                 line = line.strip()
@@ -494,14 +494,14 @@ class Api:
                     try:
                         progress_str = line.split('overall_progress:')[1].strip()
                         progress = int(progress_str.replace('%', ''))
-                        self._call_js(f'updateProgress({progress})')
+                        self._send_frontend_event(f'updateProgress({progress})')
                     except (ValueError, IndexError):
                         pass
 
                 output_match = re.search(r'output_path:([^,\r\n]+)', line)
                 if output_match:
-                    output_path = to_ubuntu_path(output_match.group(1).strip())
-                    self._call_js(f'processingOutputPath({json.dumps(output_path)})')
+                    output_path = normalize_runtime_path(output_match.group(1).strip())
+                    self._send_frontend_event(f'processingOutputPath({json.dumps(output_path)})')
 
                 # Send log line to frontend
                 escaped = json.dumps(line)
@@ -515,54 +515,54 @@ class Api:
                 else:
                     color = 'text-gray-400'
 
-                self._call_js(f'addLog({escaped}, "{color}")')
+                self._send_frontend_event(f'addLog({escaped}, "{color}")')
 
-            self.process.wait()
-            self._call_js('processingComplete()')
+            self._slayer_process.wait()
+            self._send_frontend_event('processingComplete()')
 
         except Exception as e:
             import traceback
             error_msg = json.dumps(f"Error: {str(e)}")
-            self._call_js(f'addLog({error_msg}, "text-error")')
+            self._send_frontend_event(f'addLog({error_msg}, "text-error")')
             # Log full traceback for debugging
             tb = json.dumps(traceback.format_exc())
-            self._call_js(f'addLog({tb}, "text-gray-500")')
-            self._call_js('processingComplete()')
+            self._send_frontend_event(f'addLog({tb}, "text-gray-500")')
+            self._send_frontend_event('processingComplete()')
 
         finally:
-            self.is_running = False
-            self.process = None
+            self._job_active = False
+            self._slayer_process = None
 
-    def _call_js(self, js_code):
+    def _send_frontend_event(self, js_code):
         """Safely call JavaScript in the frontend"""
-        if self.window:
+        if self._frontend_window:
             try:
-                self.window.evaluate_js(js_code)
+                self._frontend_window.evaluate_js(js_code)
             except Exception:
                 pass
 
-    def stop_processing(self):
+    def halt_slayer_job(self):
         """Stop the current processing"""
-        self.is_running = False
+        self._job_active = False
 
-        if self.process:
+        if self._slayer_process:
             try:
-                self.process.terminate()
+                self._slayer_process.terminate()
                 try:
-                    self.process.wait(timeout=0.5)
+                    self._slayer_process.wait(timeout=0.5)
                 except subprocess.TimeoutExpired:
-                    self.process.kill()
+                    self._slayer_process.kill()
             except Exception:
                 pass
 
         return {'status': 'stopped'}
 
-    def preview_detection(self, settings):
+    def preview_slayer_detection(self, settings):
         """
         Preview watermark detection via CLI subprocess.
         Returns image with bounding boxes drawn as base64.
         """
-        input_path = to_ubuntu_path(settings.get('input', ''))
+        input_path = normalize_runtime_path(settings.get('input', ''))
         detection_prompt = settings.get('detection_prompt', 'watermark')
         detection_classes = settings.get('detection_classes', [])
         if isinstance(detection_classes, str):
@@ -571,8 +571,8 @@ class Api:
             detection_classes_arg = ','.join([str(item).strip() for item in detection_classes if str(item).strip()])
         detection_output_label = settings.get('detection_output_label', 'watermark')
         detection_task = settings.get('detection_task', 'auto')
-        florence_model_id = to_ubuntu_path(settings.get('florence_model_id', DEFAULT_FLORENCE_MODEL_ID))
-        florence_adapter_dir = to_ubuntu_path(settings.get('florence_adapter_dir', DEFAULT_FLORENCE_ADAPTER_DIR))
+        florence_model_id = normalize_runtime_path(settings.get('florence_model_id', DEFAULT_FLORENCE_MODEL_ID))
+        florence_adapter_dir = normalize_runtime_path(settings.get('florence_adapter_dir', DEFAULT_FLORENCE_ADAPTER_DIR))
         florence_max_new_tokens = int(settings.get('florence_max_new_tokens', DEFAULT_FLORENCE_MAX_NEW_TOKENS) or DEFAULT_FLORENCE_MAX_NEW_TOKENS)
         florence_num_beams = int(settings.get('florence_num_beams', DEFAULT_FLORENCE_NUM_BEAMS) or DEFAULT_FLORENCE_NUM_BEAMS)
         florence_use_fast_processor = bool(settings.get('florence_use_fast_processor', True))
@@ -626,9 +626,9 @@ class Api:
         except Exception as e:
             return {'error': str(e)}
 
-def main():
+def launch_gui():
     """Main entry point"""
-    api = Api()
+    bridge = SlayerBridge()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     ui_path = os.path.join(script_dir, 'ui', 'index.html')
@@ -636,16 +636,16 @@ def main():
     window = webview.create_window(
         'Watermark Slayer',
         ui_path,
-        js_api=api,
+        js_api=bridge,
         width=950,
         height=860,
         min_size=(800, 600),
         background_color='#050505'
     )
 
-    api.set_window(window)
+    bridge.attach_window(window)
     webview.start()
 
 
 if __name__ == '__main__':
-    main()
+    launch_gui()

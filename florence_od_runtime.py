@@ -26,7 +26,7 @@ DEFAULT_ADAPTER_DIR = ""
 DEFAULT_TASK = "<OD>"
 
 
-def sanitize_label(label: str, fallback: str = "watermark") -> str:
+def canonical_label(label: str, fallback: str = "watermark") -> str:
     label = (label or "").strip().lower()
     cleaned = []
     prev_us = False
@@ -46,7 +46,7 @@ def sanitize_label(label: str, fallback: str = "watermark") -> str:
 def parse_optional_label(label: Optional[str]) -> Optional[str]:
     if label is None:
         return None
-    s = sanitize_label(str(label), fallback="")
+    s = canonical_label(str(label), fallback="")
     if s in ("", "none", "null"):
         return None
     return s
@@ -64,12 +64,12 @@ def merge_instances_labels(
         if target is not None:
             item["label"] = target
         else:
-            item["label"] = sanitize_label(str(item.get("label", "")), fallback=fallback)
+            item["label"] = canonical_label(str(item.get("label", "")), fallback=fallback)
         out.append(item)
     return out
 
 
-def normalize_box(box: Sequence[float], image_size: Tuple[int, int]) -> List[float]:
+def clamp_box_to_image(box: Sequence[float], image_size: Tuple[int, int]) -> List[float]:
     width, height = image_size
     x1, y1, x2, y2 = [float(v) for v in box]
     x1 = min(max(0.0, x1), float(width))
@@ -79,7 +79,7 @@ def normalize_box(box: Sequence[float], image_size: Tuple[int, int]) -> List[flo
     return [x1, y1, x2, y2]
 
 
-def extract_od_predictions(parsed: Any, task: str = "<OD>") -> List[Dict[str, Any]]:
+def collect_detector_predictions(parsed: Any, task: str = "<OD>") -> List[Dict[str, Any]]:
     payload = parsed
     if isinstance(parsed, dict) and task in parsed:
         payload = parsed[task]
@@ -97,7 +97,7 @@ def extract_od_predictions(parsed: Any, task: str = "<OD>") -> List[Dict[str, An
             score = scores[i] if i < len(scores) else None
             preds.append(
                 {
-                    "label": sanitize_label(str(label), fallback="object"),
+                    "label": canonical_label(str(label), fallback="object"),
                     "bbox_xyxy": [float(v) for v in box],
                     "score": None if score is None else float(score),
                 }
@@ -115,7 +115,7 @@ def extract_od_predictions(parsed: Any, task: str = "<OD>") -> List[Dict[str, An
             score = item.get("score")
             preds.append(
                 {
-                    "label": sanitize_label(str(label), fallback="object"),
+                    "label": canonical_label(str(label), fallback="object"),
                     "bbox_xyxy": [float(v) for v in box],
                     "score": None if score is None else float(score),
                 }
@@ -125,7 +125,7 @@ def extract_od_predictions(parsed: Any, task: str = "<OD>") -> List[Dict[str, An
     return preds
 
 
-def get_first_float_dtype(model: torch.nn.Module) -> torch.dtype:
+def first_float_dtype(model: torch.nn.Module) -> torch.dtype:
     for param in model.parameters():
         if param.is_floating_point():
             return param.dtype
@@ -207,7 +207,7 @@ def _load_processor(
         return processor, "default"
 
 
-def load_model_and_processor(
+def load_detector_stack(
     model_id: str,
     adapter_dir: Optional[str],
     use_fast_processor: bool,
@@ -259,7 +259,7 @@ def load_model_and_processor(
         raise
 
 
-def move_inputs_to_device(
+def move_batch_to_device(
     inputs: Dict[str, Any],
     device: torch.device,
     pixel_values_dtype: torch.dtype,
