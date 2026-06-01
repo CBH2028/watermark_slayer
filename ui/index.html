@@ -210,98 +210,27 @@
                 </div>
             </section>
 
-            <section class="panel compare-panel">
-                <div class="panel-head">
-                    <div>
-                        <h3 data-i18n="compare.title">Before / After</h3>
-                        <p data-i18n="compare.subtitle">Detection preview and processed output stay side by side.</p>
-                    </div>
-                    <span id="compareStatus" data-i18n="compare.waiting">Waiting</span>
-                </div>
-
-                <div class="compare-grid">
-                    <div class="compare-pane">
-                        <div class="compare-pane-head">
-                            <h4 data-i18n="compare.before">Before</h4>
-                            <span id="compareBeforeName">-</span>
-                        </div>
-                        <div class="compare-media">
-                            <img id="compareBeforeImage" class="hidden" alt="Before image">
-                            <video id="compareBeforeVideo" class="hidden" muted playsinline preload="metadata"></video>
-                            <div id="compareBeforeEmpty" class="compare-empty" data-i18n="compare.before_empty">Select an image or video.</div>
-                        </div>
-                    </div>
-
-                    <div class="compare-pane">
-                        <div class="compare-pane-head">
-                            <h4 data-i18n="compare.after">After</h4>
-                            <span id="compareAfterName">-</span>
-                        </div>
-                        <div class="compare-media">
-                            <img id="compareAfterImage" class="hidden" alt="After image">
-                            <video id="compareAfterVideo" class="hidden" muted playsinline preload="metadata"></video>
-                            <div id="compareAfterEmpty" class="compare-empty" data-i18n="compare.after_empty">Detection boxes or processed output will appear here.</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="compare-controls">
-                    <button id="comparePlayPause" type="button" class="secondary-button compact" data-i18n="compare.play">Play</button>
-                    <label class="field">
-                        <span data-i18n="compare.progress">Progress</span>
-                        <input id="compareTimeline" type="range" min="0" max="1000" value="0">
-                    </label>
-                    <label class="field speed-field">
-                        <span data-i18n="compare.speed">Speed</span>
-                        <select id="compareSpeed">
-                            <option value="0.25">0.25x</option>
-                            <option value="0.5">0.5x</option>
-                            <option value="1" selected>1x</option>
-                            <option value="1.5">1.5x</option>
-                            <option value="2">2x</option>
-                            <option value="4">4x</option>
-                        </select>
-                    </label>
-                </div>
-            </section>
-
             <section class="runtime-layout">
-                <div class="status-stack">
-                    <div class="panel progress-panel">
-                        <div class="panel-head">
-                            <h3 data-i18n="labels.progress">Progress</h3>
-                            <span id="statusText" data-i18n="labels.idle">Idle</span>
-                        </div>
-                        <div class="progress-track" aria-label="Progress">
-                            <div id="progressFill" class="progress-fill"></div>
-                        </div>
-                        <div class="progress-meta">
-                            <span id="progressValue">0%</span>
-                            <span id="statusMessage">Ready</span>
-                        </div>
+                <div class="panel system-panel">
+                    <div class="panel-head">
+                        <h3 data-i18n="sections.system">System</h3>
                     </div>
-
-                    <div class="panel system-panel">
-                        <div class="panel-head">
-                            <h3 data-i18n="sections.system">System</h3>
+                    <div class="system-grid">
+                        <div class="system-item">
+                            <span data-i18n="status_bar.cuda">CUDA</span>
+                            <strong id="cudaState">--</strong>
                         </div>
-                        <div class="system-grid">
-                            <div class="system-item">
-                                <span data-i18n="status_bar.cuda">CUDA</span>
-                                <strong id="cudaState">--</strong>
-                            </div>
-                            <div class="system-item">
-                                <span data-i18n="status_bar.ffmpeg">FFmpeg</span>
-                                <strong id="ffmpegState">--</strong>
-                            </div>
-                            <div class="system-item">
-                                <span data-i18n="status_bar.ram">RAM</span>
-                                <strong id="ramState">--</strong>
-                            </div>
-                            <div class="system-item wide">
-                                <span>Device</span>
-                                <strong id="gpuState">--</strong>
-                            </div>
+                        <div class="system-item">
+                            <span data-i18n="status_bar.ffmpeg">FFmpeg</span>
+                            <strong id="ffmpegState">--</strong>
+                        </div>
+                        <div class="system-item">
+                            <span data-i18n="status_bar.ram">RAM</span>
+                            <strong id="ramState">--</strong>
+                        </div>
+                        <div class="system-item wide">
+                            <span>Device</span>
+                            <strong id="gpuState">--</strong>
                         </div>
                     </div>
                 </div>
@@ -399,6 +328,19 @@
                         <img id="processAfterImage" class="hidden" alt="Processing after">
                         <div id="processAfterEmpty" class="compare-empty" data-i18n="process_modal.after_empty">Waiting for the processed frame.</div>
                     </div>
+                </div>
+            </div>
+            <div class="process-progress-panel">
+                <div class="panel-head">
+                    <h3 data-i18n="labels.progress">Progress</h3>
+                    <span id="statusText" data-i18n="labels.idle">Idle</span>
+                </div>
+                <div class="progress-track" aria-label="Progress">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+                <div class="progress-meta">
+                    <span id="progressValue">0%</span>
+                    <span id="statusMessage">Ready</span>
                 </div>
             </div>
             <footer class="process-modal-footer">
@@ -827,11 +769,7 @@
                 'startButton', 'stopButton', 'previewButton', 'stageBrowse', 'dropZone',
                 'florenceModelId', 'browseFlorenceModel', 'florenceAdapterDir',
                 'browseFlorenceAdapter', 'florenceMaxTokens', 'florenceNumBeams',
-                'florenceUseFastProcessor', 'compareStatus', 'compareBeforeName',
-                'compareAfterName', 'compareBeforeImage', 'compareAfterImage',
-                'compareBeforeVideo', 'compareAfterVideo', 'compareBeforeEmpty',
-                'compareAfterEmpty', 'comparePlayPause', 'compareTimeline', 'compareSpeed',
-                'selectedTitle', 'selectedSubtitle', 'pathDisplay', 'fileKind',
+                'florenceUseFastProcessor', 'selectedTitle', 'selectedSubtitle', 'pathDisplay', 'fileKind',
                 'statusText', 'progressFill', 'progressValue', 'statusMessage',
                 'cudaState', 'ffmpegState', 'ramState', 'gpuState', 'logs', 'clearLogs',
                 'previewModal', 'closePreview', 'closePreviewFooter', 'previewLoading',
@@ -956,14 +894,6 @@
             dom.florenceMaxTokens.addEventListener('input', () => { appState.florenceTest.maxNewTokens = parseInt(dom.florenceMaxTokens.value, 10) || 256; queueBridgeStateSave(); });
             dom.florenceNumBeams.addEventListener('input', () => { appState.florenceTest.numBeams = parseInt(dom.florenceNumBeams.value, 10) || 3; queueBridgeStateSave(); });
             dom.florenceUseFastProcessor.addEventListener('change', () => { appState.florenceTest.useFastProcessor = dom.florenceUseFastProcessor.checked; queueBridgeStateSave(); });
-            dom.comparePlayPause.addEventListener('click', togglePlayback);
-            dom.compareSpeed.addEventListener('change', () => {
-                appState.compare.speed = parseFloat(dom.compareSpeed.value) || 1;
-                applyPlaybackRate();
-            });
-            dom.compareTimeline.addEventListener('input', () => seekComparison());
-            dom.compareBeforeVideo.addEventListener('timeupdate', syncPlaybackTimeline);
-            dom.compareAfterVideo.addEventListener('timeupdate', syncPlaybackTimeline);
             dom.closePreview.addEventListener('click', hidePreviewDialog);
             dom.closePreviewFooter.addEventListener('click', hidePreviewDialog);
             dom.previewModal.addEventListener('click', event => {
@@ -1543,25 +1473,7 @@
         }
 
         function renderComparisonPane() {
-            const before = appState.compare.before;
-            const after = appState.compare.after;
-            renderMediaPane(before, dom.compareBeforeImage, dom.compareBeforeVideo, dom.compareBeforeEmpty);
-            renderMediaPane(after, dom.compareAfterImage, dom.compareAfterVideo, dom.compareAfterEmpty);
-
-            dom.compareBeforeName.textContent = before ? (before.name || formatPathLabel(before.path)) : '-';
-            dom.compareAfterName.textContent = after ? (after.name || formatPathLabel(after.path)) : '-';
-
-            const liveStatuses = ['detecting', 'frame_detected', 'frame_processed'];
-            const statusKey = liveStatuses.includes(appState.compare.status) ? appState.compare.status : (appState.processing ? 'processing' : appState.compare.status);
-            dom.compareStatus.textContent = text(`compare.${statusKey}`, text('compare.waiting'));
-
-            const videoReady = before && after && before.kind === 'video' && after.kind === 'video';
-            dom.comparePlayPause.disabled = !videoReady;
-            dom.compareTimeline.disabled = !videoReady;
-            dom.compareSpeed.disabled = !videoReady;
-            dom.comparePlayPause.textContent = appState.compare.playing ? text('compare.pause') : text('compare.play');
-            dom.compareTimeline.value = appState.compare.timeline;
-            dom.compareSpeed.value = String(appState.compare.speed);
+            // Main-page before/after UI was removed; live images now render in processModal.
         }
 
         async function loadSourceMedia() {
@@ -1702,18 +1614,11 @@
                 .filter(item => item && item.kind === 'video')
                 .map(item => Number(item.duration || 0))
                 .filter(value => Number.isFinite(value) && value > 0);
-            if (mediaDurations.length) return Math.min(...mediaDurations);
-
-            const before = dom.compareBeforeVideo;
-            const after = dom.compareAfterVideo;
-            const durations = [before.duration, after.duration].filter(value => Number.isFinite(value) && value > 0);
-            return durations.length ? Math.min(...durations) : 0;
+            return mediaDurations.length ? Math.min(...mediaDurations) : 0;
         }
 
         function applyPlaybackRate() {
-            const speed = parseFloat(appState.compare.speed) || 1;
-            dom.compareBeforeVideo.playbackRate = speed;
-            dom.compareAfterVideo.playbackRate = speed;
+            // Native video controls were removed from the main page.
         }
 
         function startFramePlayback() {
@@ -1769,46 +1674,16 @@
                 renderComparisonPane();
                 return;
             }
-
-            const before = dom.compareBeforeVideo;
-            const after = dom.compareAfterVideo;
-            if (!(appState.compare.before && appState.compare.after && appState.compare.before.kind === 'video' && appState.compare.after.kind === 'video')) return;
-
-            applyPlaybackRate();
-            if (appState.compare.playing) {
-                before.pause();
-                after.pause();
-                appState.compare.playing = false;
-            } else {
-                const targetTime = before.currentTime || after.currentTime || 0;
-                before.currentTime = targetTime;
-                after.currentTime = targetTime;
-                Promise.allSettled([before.play(), after.play()]);
-                appState.compare.playing = true;
-            }
-            renderComparisonPane();
         }
 
         function seekComparison() {
-            appState.compare.timeline = parseInt(dom.compareTimeline.value, 10) || 0;
             if (hasFrameComparison()) {
                 renderComparisonPane();
-                return;
             }
-
-            const duration = comparisonDuration();
-            if (!duration) return;
-            const targetTime = duration * (appState.compare.timeline / 1000);
-            dom.compareBeforeVideo.currentTime = targetTime;
-            dom.compareAfterVideo.currentTime = targetTime;
         }
 
         function syncPlaybackTimeline() {
-            if (hasFrameComparison()) return;
-            const duration = comparisonDuration();
-            if (!duration || document.activeElement === dom.compareTimeline) return;
-            appState.compare.timeline = Math.round((dom.compareBeforeVideo.currentTime / duration) * 1000);
-            dom.compareTimeline.value = appState.compare.timeline;
+            // Native video controls were removed from the main page.
         }
 
         function renderProgressState() {
@@ -1908,13 +1783,6 @@
         function registerBridgeCallbacks() {
             window.updateProgress = percent => {
                 appState.progress = parseInt(percent, 10) || 0;
-                if (appState.compare.before && appState.compare.before.kind === 'video' && !(appState.compare.after && appState.compare.after.kind === 'video')) {
-                    appState.compare.timeline = Math.max(0, Math.min(1000, Math.round(appState.progress * 10)));
-                    dom.compareTimeline.value = appState.compare.timeline;
-                    if (Number.isFinite(dom.compareBeforeVideo.duration) && dom.compareBeforeVideo.duration > 0) {
-                        dom.compareBeforeVideo.currentTime = dom.compareBeforeVideo.duration * (appState.progress / 100);
-                    }
-                }
                 renderProgressState();
             };
             window.addLog = (message, color) => {
