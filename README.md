@@ -21,7 +21,7 @@ It uses Florence-2 from Microsoft for watermark identification and LaMA for inpa
 ## Demo
 
 
-https://github.com/user-attachments/assets/505be2a8-8eda-4def-90b6-5a4ceefee456
+https://github.com/CBH2028/watermark_slayer/raw/refs/heads/main/assets/watermark-removal-demo.mp4
 
 
 ---
@@ -48,7 +48,7 @@ https://github.com/user-attachments/assets/505be2a8-8eda-4def-90b6-5a4ceefee456
 The setup script downloads a portable Python environment automatically - no system Python required.
 
 ```powershell
-git clone https://github.com/yijia0110/watermark_slayer.git
+git clone https://github.com/CBH2028/watermark_slayer.git
 cd watermark_slayer
 .\setup.ps1
 ```
@@ -60,7 +60,7 @@ After setup, double-click `run.bat` to launch the app.
 Requires Python 3.10+ installed on your system.
 
 ```bash
-git clone https://github.com/yijia0110/watermark_slayer.git
+git clone https://github.com/CBH2028/watermark_slayer.git
 cd watermark_slayer
 chmod +x setup.sh
 ./setup.sh
@@ -159,6 +159,6 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=yijia0110/watermark_slayer&type=date&legend=top-left)](https://www.star-history.com/#yijia0110/watermark_slayer&type=date&legend=top-left)
+[![Star History Chart](https://api.star-history.com/svg?repos=CBH2028/watermark_slayer&type=date&legend=top-left)](https://www.star-history.com/#CBH2028/watermark_slayer&type=date&legend=top-left)
 
 
