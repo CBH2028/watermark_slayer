@@ -1,0 +1,1852 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watermark Slayer</title>
+    <link rel="stylesheet" href="themes.css">
+</head>
+<body data-theme="dark">
+    <div id="app" class="app-shell">
+        <aside class="sidebar" aria-label="Controls">
+            <header class="brand">
+                <div class="brand-mark" aria-hidden="true">WM</div>
+                <div class="brand-copy">
+                    <h1 data-i18n="app.title">Watermark Slayer</h1>
+                    <p data-i18n="app.subtitle">Local AI watermark detection and inpainting</p>
+                    <span id="appVersion" class="version">v1.0</span>
+                </div>
+            </header>
+
+            <section class="control-block">
+                <div class="control-grid two">
+                    <label class="field">
+                        <span data-i18n="labels.theme">Theme</span>
+                        <select id="themeSelect"></select>
+                    </label>
+                    <label class="field">
+                        <span data-i18n="labels.language">Language</span>
+                        <select id="langSelect"></select>
+                    </label>
+                </div>
+            </section>
+
+            <section class="control-block">
+                <div class="section-title" data-i18n="modes.label">Mode</div>
+                <div class="segmented" role="group" aria-label="Mode">
+                    <button id="modeSingle" type="button" class="segment active" data-mode="single" data-i18n="modes.single">Single File</button>
+                    <button id="modeBatch" type="button" class="segment" data-mode="batch" data-i18n="modes.batch">Batch</button>
+                </div>
+            </section>
+
+            <section class="control-block">
+                <div class="section-title" data-i18n="sections.input">Input</div>
+                <label class="field">
+                    <span data-i18n="labels.input_path">Input path</span>
+                    <div class="path-row">
+                        <input id="inputPath" type="text" spellcheck="false" autocomplete="off">
+                        <button id="browseInput" class="icon-button" type="button" title="Browse" aria-label="Browse input">...</button>
+                    </div>
+                </label>
+                <label class="field">
+                    <span data-i18n="labels.output_path">Output path</span>
+                    <div class="path-row">
+                        <input id="outputPath" type="text" spellcheck="false" autocomplete="off" data-i18n-placeholder="output.placeholder">
+                        <button id="browseOutput" class="icon-button" type="button" title="Browse" aria-label="Browse output">...</button>
+                    </div>
+                </label>
+            </section>
+
+            <section class="control-block">
+                <div class="section-title" data-i18n="sections.settings">Processing</div>
+                <label class="switch-row" data-tooltip-key="settings.gaslight.tooltip">
+                    <span>
+                        <strong data-i18n="settings.gaslight.label">Overwrite output</strong>
+                        <small data-i18n="settings.gaslight.sublabel"></small>
+                    </span>
+                    <input id="overwriteToggle" type="checkbox">
+                </label>
+                <label class="switch-row" data-tooltip-key="settings.ghost.tooltip">
+                    <span>
+                        <strong data-i18n="settings.ghost.label">Transparent mode</strong>
+                        <small data-i18n="settings.ghost.sublabel">Images only</small>
+                    </span>
+                    <input id="transparentToggle" type="checkbox">
+                </label>
+
+                <label class="field range-field" data-tooltip-key="settings.sigma_detect.tooltip">
+                    <span class="range-label">
+                        <span data-i18n="settings.sigma_detect.label">Max detection area</span>
+                        <b id="detectionValue">100%</b>
+                    </span>
+                    <input id="detectionRange" type="range" min="1" max="100" value="100">
+                </label>
+
+                <label class="field" data-tooltip-key="settings.detection_prompt.tooltip">
+                    <span data-i18n="classes.fallback_prompt">Fallback prompt</span>
+                    <input id="detectionPrompt" type="text" list="promptOptions" data-i18n-placeholder="settings.detection_prompt.placeholder">
+                    <datalist id="promptOptions">
+                        <option value="watermark"></option>
+                        <option value="logo"></option>
+                        <option value="text"></option>
+                        <option value="signature"></option>
+                    </datalist>
+                </label>
+
+                <div class="class-map">
+                    <label class="field">
+                        <span data-i18n="classes.group">Unified category</span>
+                        <select id="classGroupSelect"></select>
+                    </label>
+                    <div id="classGroupDescription" class="class-description"></div>
+                    <div class="class-output">
+                        <span data-i18n="classes.output_label">Output label</span>
+                        <strong id="classOutputLabel">watermark</strong>
+                    </div>
+                    <div class="field">
+                        <span data-i18n="classes.raw_classes">Raw model classes</span>
+                        <div id="classCheckboxes" class="class-checkboxes"></div>
+                        <small data-i18n="classes.hint">Selected raw classes are merged into one output label for mask generation.</small>
+                    </div>
+                </div>
+
+                <div class="model-map">
+                    <div class="section-title" data-i18n="model_settings.title">Florence Model</div>
+                    <label class="field">
+                        <span data-i18n="model_settings.model_id">Model folder</span>
+                        <div class="path-row">
+                            <input id="florenceModelId" type="text" spellcheck="false">
+                            <button id="browseFlorenceModel" class="icon-button" type="button" title="Browse">...</button>
+                        </div>
+                    </label>
+                    <label class="field">
+                        <span data-i18n="model_settings.adapter_dir">Adapter folder</span>
+                        <div class="path-row">
+                            <input id="florenceAdapterDir" type="text" spellcheck="false">
+                            <button id="browseFlorenceAdapter" class="icon-button" type="button" title="Browse">...</button>
+                        </div>
+                    </label>
+                    <div class="control-grid two">
+                        <label class="field">
+                            <span data-i18n="model_settings.max_new_tokens">Max tokens</span>
+                            <input id="florenceMaxTokens" type="number" min="1" max="1024">
+                        </label>
+                        <label class="field">
+                            <span data-i18n="model_settings.num_beams">Beams</span>
+                            <input id="florenceNumBeams" type="number" min="1" max="10">
+                        </label>
+                    </div>
+                    <label class="switch-row compact-switch">
+                        <span>
+                            <strong data-i18n="model_settings.use_fast_processor">Fast processor</strong>
+                        </span>
+                        <input id="florenceUseFastProcessor" type="checkbox">
+                    </label>
+                </div>
+
+                <label class="field" data-tooltip-key="settings.output_format.tooltip">
+                    <span data-i18n="settings.output_format.label">Output format</span>
+                    <select id="formatSelect">
+                        <option value="None" data-i18n="settings.output_format.auto">Auto</option>
+                        <option value="PNG" data-i18n="settings.output_format.png">PNG</option>
+                        <option value="JPG" data-i18n="settings.output_format.jpg">JPG</option>
+                        <option value="WEBP" data-i18n="settings.output_format.webp">WEBP</option>
+                        <option value="MP4" data-i18n="settings.output_format.mp4">MP4</option>
+                        <option value="AVI" data-i18n="settings.output_format.avi">AVI</option>
+                    </select>
+                </label>
+            </section>
+
+            <section id="videoPanel" class="control-block">
+                <div class="section-title" data-i18n="video_settings.title">Video Settings</div>
+                <label class="field range-field">
+                    <span class="range-label">
+                        <span data-i18n="video_settings.detection_skip.label">Detection interval</span>
+                        <b><span id="detectionSkipValue">1</span> <span data-i18n="video_settings.detection_skip.unit">frames</span></b>
+                    </span>
+                    <input id="detectionSkip" type="range" min="1" max="10" value="1">
+                    <small data-i18n="video_settings.detection_skip.hint"></small>
+                </label>
+                <label class="field range-field">
+                    <span class="range-label">
+                        <span data-i18n="video_settings.fade_in.label">Lead buffer</span>
+                        <b><span id="fadeInValue">0</span>s</b>
+                    </span>
+                    <input id="fadeIn" type="range" min="0" max="2" step="0.1" value="0">
+                    <small data-i18n="video_settings.fade_in.hint"></small>
+                </label>
+                <label class="field range-field">
+                    <span class="range-label">
+                        <span data-i18n="video_settings.fade_out.label">Tail buffer</span>
+                        <b><span id="fadeOutValue">0</span>s</b>
+                    </span>
+                    <input id="fadeOut" type="range" min="0" max="2" step="0.1" value="0">
+                    <small data-i18n="video_settings.fade_out.hint"></small>
+                </label>
+            </section>
+
+            <section class="control-block actions">
+                <button id="startButton" type="button" class="primary-button" data-i18n="buttons.start">Start Processing</button>
+                <button id="stopButton" type="button" class="secondary-button" data-i18n="buttons.stop">Stop</button>
+                <button id="previewButton" type="button" class="secondary-button" data-i18n="buttons.preview">Preview Detection</button>
+            </section>
+        </aside>
+
+        <main class="workspace">
+            <section class="hero-panel">
+                <div>
+                    <p class="eyebrow" data-i18n="labels.current_file">Current input</p>
+                    <h2 id="selectedTitle" data-i18n="dropzone.title">Select a file or folder</h2>
+                    <p id="selectedSubtitle" data-i18n="dropzone.subtitle">Images, videos, and batch folders are supported</p>
+                </div>
+                <button id="stageBrowse" type="button" class="primary-button compact" data-i18n="buttons.select_input">Select Input</button>
+            </section>
+
+            <section id="dropZone" class="drop-zone" tabindex="0">
+                <div class="drop-symbol" aria-hidden="true"></div>
+                <div>
+                    <strong id="pathDisplay" data-i18n="labels.not_selected">Not selected</strong>
+                    <span id="fileKind" data-i18n="labels.ready">Ready</span>
+                </div>
+            </section>
+
+            <section class="runtime-layout">
+                <div class="panel system-panel">
+                    <div class="panel-head">
+                        <h3 data-i18n="sections.system">System</h3>
+                    </div>
+                    <div class="system-grid">
+                        <div class="system-item">
+                            <span data-i18n="status_bar.cuda">CUDA</span>
+                            <strong id="cudaState">--</strong>
+                        </div>
+                        <div class="system-item">
+                            <span data-i18n="status_bar.ffmpeg">FFmpeg</span>
+                            <strong id="ffmpegState">--</strong>
+                        </div>
+                        <div class="system-item">
+                            <span data-i18n="status_bar.ram">RAM</span>
+                            <strong id="ramState">--</strong>
+                        </div>
+                        <div class="system-item wide">
+                            <span>Device</span>
+                            <strong id="gpuState">--</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <section class="panel log-panel">
+                    <div class="panel-head">
+                        <h3 data-i18n="sections.logs">Logs</h3>
+                        <button id="clearLogs" type="button" class="text-button">Clear</button>
+                    </div>
+                    <div id="logs" class="logs" aria-live="polite"></div>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <div id="previewModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+        <div class="modal-surface">
+            <header class="modal-head">
+                <div>
+                    <p class="eyebrow" data-i18n="sections.preview">Preview</p>
+                    <h2 id="previewTitle" data-i18n="preview_modal.title">Detection Preview</h2>
+                </div>
+                <button id="closePreview" type="button" class="icon-button close" aria-label="Close">x</button>
+            </header>
+            <div id="previewBody" class="preview-body">
+                <div id="previewLoading" class="preview-appState hidden">
+                    <div class="loader"></div>
+                    <strong data-i18n="preview_modal.loading">Detecting...</strong>
+                    <span data-i18n="preview_modal.loading_hint">The first run may need to download model files.</span>
+                </div>
+                <div id="previewError" class="preview-error hidden"></div>
+                <img id="previewImage" class="preview-image hidden" alt="Detection preview">
+            </div>
+            <div class="preview-meta">
+                <div>
+                    <span data-i18n="preview_modal.prompt">Prompt:</span>
+                    <strong id="previewPrompt">-</strong>
+                </div>
+                <div>
+                    <span data-i18n="preview_modal.detected">Detected:</span>
+                    <strong><span id="previewCount">0</span> <span data-i18n="preview_modal.regions">region(s)</span></strong>
+                </div>
+                <div class="wide">
+                    <span data-i18n="preview_modal.source">Source:</span>
+                    <strong id="previewSource">-</strong>
+                </div>
+            </div>
+            <div class="preview-list">
+                <h3 data-i18n="preview_modal.bounding_boxes">Bounding Boxes</h3>
+                <div id="previewDetections"></div>
+            </div>
+            <div class="preview-raw test-json-grid">
+                <div>
+                    <h3 data-i18n="preview_modal.generated_text">Florence Generated Text</h3>
+                    <pre id="previewGeneratedText"></pre>
+                </div>
+                <div>
+                    <h3 data-i18n="preview_modal.predictions_raw">Raw OD Predictions</h3>
+                    <pre id="previewRawPredictions"></pre>
+                </div>
+            </div>
+            <footer class="modal-actions">
+                <button id="rerunPreview" type="button" class="secondary-button" data-i18n="buttons.try_again">Run Again</button>
+                <button id="closePreviewFooter" type="button" class="primary-button compact" data-i18n="buttons.close">Close</button>
+            </footer>
+        </div>
+    </div>
+
+    <div id="processModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="processModalTitle">
+        <div class="modal-surface process-surface">
+            <header class="modal-head">
+                <div>
+                    <p class="eyebrow" data-i18n="process_modal.eyebrow">Processing Preview</p>
+                    <h2 id="processModalTitle" data-i18n="process_modal.title">Live Before / After</h2>
+                </div>
+                <button id="closeProcessModal" type="button" class="icon-button close" aria-label="Close">x</button>
+            </header>
+            <div class="process-live-grid">
+                <div class="process-frame-card">
+                    <div class="compare-pane-head">
+                        <h4 data-i18n="compare.before">Before</h4>
+                        <span id="processBeforeName">-</span>
+                    </div>
+                    <div class="process-frame-stage">
+                        <img id="processBeforeImage" class="hidden" alt="Processing before">
+                        <div id="processBeforeEmpty" class="compare-empty" data-i18n="process_modal.before_empty">Waiting for the current frame.</div>
+                    </div>
+                </div>
+                <div class="process-frame-card">
+                    <div class="compare-pane-head">
+                        <h4 data-i18n="compare.after">After</h4>
+                        <span id="processAfterName">-</span>
+                    </div>
+                    <div class="process-frame-stage">
+                        <img id="processAfterImage" class="hidden" alt="Processing after">
+                        <div id="processAfterEmpty" class="compare-empty" data-i18n="process_modal.after_empty">Waiting for the processed frame.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="process-progress-panel">
+                <div class="panel-head">
+                    <h3 data-i18n="labels.progress">Progress</h3>
+                    <span id="statusText" data-i18n="labels.idle">Idle</span>
+                </div>
+                <div class="progress-track" aria-label="Progress">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+                <div class="progress-meta">
+                    <span id="progressValue">0%</span>
+                    <span id="statusMessage">Ready</span>
+                </div>
+            </div>
+            <footer class="process-modal-footer">
+                <span id="processModalStatus" data-i18n="process_modal.waiting">Waiting for frames...</span>
+                <button id="closeProcessModalFooter" type="button" class="primary-button compact" data-i18n="buttons.close">Close</button>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        const defaultCopy = {
+            app: { title: 'Watermark Slayer', subtitle: 'Local AI watermark detection and inpainting' },
+            sections: { input: 'Input', output: 'Output', settings: 'Processing', video: 'Video', system: 'System', logs: 'Logs', preview: 'Preview' },
+            modes: { label: 'Mode', single: 'Single File', batch: 'Batch' },
+            settings: {
+                gaslight: { label: 'Overwrite output', sublabel: '', tooltip: 'Allow replacing existing output files.' },
+                ghost: { label: 'Transparent mode', sublabel: 'Images only', tooltip: 'Make detected regions transparent instead of inpainting.' },
+                sigma_detect: { label: 'Max detection area', tooltip: 'Detections larger than this percentage are skipped.' },
+                detection_prompt: { label: 'Detection prompt', placeholder: 'watermark', tooltip: 'Tell the model what to detect.' },
+                output_format: { label: 'Output format', auto: 'Auto', png: 'PNG', jpg: 'JPG', webp: 'WEBP', mp4: 'MP4', avi: 'AVI' }
+            },
+            classes: { title: 'Class Mapping', group: 'Unified category', raw_classes: 'Raw model classes', output_label: 'Output label', fallback_prompt: 'Fallback prompt', empty: 'No classes are available. Check detection_classes.json.', hint: 'Selected raw classes are merged into one output label for mask generation.' },
+            video_settings: {
+                title: 'Video Settings',
+                detection_skip: { label: 'Detection interval', unit: 'frames', hint: 'Higher values are faster but may miss short-lived watermarks.' },
+                fade_in: { label: 'Lead buffer', hint: 'Extend the mask backward in time.' },
+                fade_out: { label: 'Tail buffer', hint: 'Extend the mask forward in time.' }
+            },
+            model_settings: { title: 'Florence Model', model_id: 'Model folder', adapter_dir: 'Adapter folder', max_new_tokens: 'Max tokens', num_beams: 'Beams', use_fast_processor: 'Fast processor' },
+            buttons: { preview: 'Preview Detection', preview_loading: 'Detecting...', start: 'Start Processing', start_processing: 'Processing...', stop: 'Stop', select_input: 'Select Input', try_again: 'Run Again', close: 'Close' },
+            compare: { title: 'Before / After', subtitle: 'Detection preview and processed output stay side by side.', waiting: 'Waiting', detecting: 'Detection preview', processing: 'Processing', frame_detected: 'Florence frame detected', frame_processed: 'iopaint frame processed', done: 'Processed', before: 'Before', after: 'After', before_empty: 'Select an image or video.', after_empty: 'Detection boxes or processed output will appear here.', before_frame: 'Frame {frame}/{total} · Florence boxes', after_frame: 'Frame {frame}/{total} · iopaint result', live_detected: 'Florence detected frame {frame}/{total}', live_processed: 'iopaint processed frame {frame}/{total}', play: 'Play', pause: 'Pause', progress: 'Progress', speed: 'Speed' },
+            dropzone: { title: 'Select a file or folder', subtitle: 'Images, videos, and batch folders are supported', video_hint: 'Video file', image_hint: 'Image file', folder_hint: 'Batch folder' },
+            output: { placeholder: 'Defaults to the input folder' },
+            status_bar: { cuda: 'CUDA', ffmpeg: 'FFmpeg', ram: 'RAM', on: 'Available', off: 'Unavailable', cpu_mode: 'CPU Mode' },
+            preview_modal: { title: 'Detection Preview', prompt: 'Prompt:', detected: 'Detected:', source: 'Source:', regions: 'region(s)', bounding_boxes: 'Bounding Boxes', generated_text: 'Florence Generated Text', predictions_raw: 'Raw OD Predictions', of_image: '% of image', too_large: 'Skipped', loading: 'Detecting...', loading_hint: 'The first run may need to download model files.' },
+            process_modal: { eyebrow: 'Processing Preview', title: 'Live Before / After', waiting: 'Waiting for frames...', before_empty: 'Waiting for the current frame.', after_empty: 'Waiting for the processed frame.' },
+            processing_status: ['Preparing models...', 'Detecting watermark regions...', 'Building masks...', 'Running inpainting...', 'Writing output...'],
+            logs: { init: 'Interface ready.', starting: 'Processing started.', first_run_hint: 'First run may download model files.', done: 'Processing complete.', stopped: 'Task stopped.', no_input: 'Select an input path first.', ghost_video_warning: 'Transparent mode is not supported for videos. It has been disabled.', no_ffmpeg: 'FFmpeg was not detected. Video output may not include audio.', api_error: 'Backend API is unavailable. Start the app with run.sh or run.bat.', preview_failed: 'Preview failed:', preview_result: 'Detected {total} region(s); {accepted} will be processed.', cooking: 'Processing...' },
+            labels: { theme: 'Theme', language: 'Language', input_path: 'Input path', output_path: 'Output path', current_file: 'Current input', idle: 'Idle', progress: 'Progress', ready: 'Ready', not_selected: 'Not selected', api_unavailable: 'API disconnected' }
+        };
+
+        const bundledUiConfig = {
+            version: '1.0',
+            themes: [
+                { id: 'dark', name: 'Dark' },
+                { id: 'light', name: 'Light' }
+            ],
+            languages: [
+                { id: 'zh', icon: 'CN', name: '中文' },
+                { id: 'en', icon: 'EN', name: 'English' }
+            ]
+        };
+
+        const bundledDetectionConfig = {
+            version: 1,
+            default_group: 'watermark',
+            groups: [
+                {
+                    id: 'watermark',
+                    name: 'Watermark',
+                    name_zh: '水印',
+                    name_en: 'Watermark',
+                    output_label: 'watermark',
+                    task: 'od',
+                    description: 'Unified watermark category composed from raw Florence-2 labels.',
+                    description_zh: '由微调 Florence-2 输出的原始水印类别合并而成。',
+                    description_en: 'Unified watermark category composed from raw Florence-2 labels.',
+                    classes: [
+                        { id: 'wm_sd', name: 'SD Watermark', name_zh: 'SD 水印', name_en: 'SD Watermark' },
+                        { id: 'wm_blur', name: 'Blur Watermark', name_zh: '模糊水印', name_en: 'Blur Watermark' }
+                    ]
+                }
+            ]
+        };
+
+        const supportedVideoExtensions = ['mp4', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'webm'];
+        const supportedImageExtensions = ['png', 'jpg', 'jpeg', 'webp', 'bmp'];
+        const outputFormatValues = ['None', 'PNG', 'JPG', 'WEBP', 'MP4', 'AVI'];
+        const fallbackOutputPath = '/home/h3c/cbh_ws/water_marked/outputs';
+
+        const appState = {
+            uiConfig: bundledUiConfig,
+            detectionClassConfig: bundledDetectionConfig,
+            t: defaultCopy,
+            configLoaded: false,
+            mode: 'single',
+            overwrite: false,
+            transparent: false,
+            detection: 100,
+            format: 'None',
+            inputPath: '',
+            outputPath: fallbackOutputPath,
+            processing: false,
+            progress: 0,
+            statusMsg: '',
+            theme: 'dark',
+            lang: 'zh',
+            detectionPrompt: 'watermark',
+            detectionGroup: 'watermark',
+            detectionOutputLabel: 'watermark',
+            detectionTask: 'auto',
+            selectedDetectionClasses: [],
+            detectionSkip: 1,
+            fadeIn: 0,
+            fadeOut: 0,
+            logs: [],
+            logSeq: Date.now(),
+            systemInfo: { cuda: false, gpu: '--', ffmpeg: false, ram: 0 },
+            preview: { loading: false, error: '', image: '', detections: [], prompt: '', source: '', generatedText: '', predictionsRaw: [], parsed: null },
+            compare: { before: null, after: null, status: 'waiting', outputPath: '', speed: 1, timeline: 0, playing: false, liveFrame: null },
+            processPreview: { visible: false, beforeSrc: '', afterSrc: '', beforeName: '-', afterName: '-', status: '' },
+            florenceTest: {
+                modelId: '/home/h3c/cbh_ws/florence_train/fused_model',
+                adapterDir: '',
+                maxNewTokens: 256,
+                numBeams: 3,
+                useFastProcessor: true
+            },
+            statusTimer: null,
+            saveTimer: null
+        };
+
+        const $ = (selector, root = document) => root.querySelector(selector);
+        const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+        const dom = {};
+        let framePlaybackRequest = null;
+
+        function slayerApi() {
+            return window.pywebview && window.pywebview.api ? window.pywebview.api : null;
+        }
+
+        function text(path, fallback = '') {
+            const fromLang = path.split('.').reduce((acc, part) => acc && acc[part], appState.t);
+            if (typeof fromLang === 'string') return fromLang;
+            const fromFallback = path.split('.').reduce((acc, part) => acc && acc[part], defaultCopy);
+            return typeof fromFallback === 'string' ? fromFallback : fallback;
+        }
+
+        function normalizeThemeChoice(theme) {
+            const themes = appState.uiConfig.themes.map(item => item.id);
+            return themes.includes(theme) ? theme : 'dark';
+        }
+
+        function normalizeLanguageChoice(lang) {
+            const langs = appState.uiConfig.languages.map(item => item.id);
+            return langs.includes(lang) ? lang : 'zh';
+        }
+
+        function normalizeOutputFormat(format) {
+            return outputFormatValues.includes(format) ? format : 'None';
+        }
+
+        function activeClassGroup() {
+            const groups = appState.detectionClassConfig.groups || [];
+            return groups.find(group => group.id === appState.detectionGroup) || groups[0] || null;
+        }
+
+        function classGroupIds(group) {
+            return (group && Array.isArray(group.classes) ? group.classes : []).map(item => item.id || item).filter(Boolean);
+        }
+
+        function normalizeClassGroup(groupId) {
+            const groups = appState.detectionClassConfig.groups || [];
+            if (groups.some(group => group.id === groupId)) return groupId;
+            return appState.detectionClassConfig.default_group || (groups[0] && groups[0].id) || 'watermark';
+        }
+
+        function normalizeClassSelection(selected, group) {
+            const available = classGroupIds(group);
+            const selectedSet = new Set(Array.isArray(selected) ? selected : []);
+            const normalized = available.filter(id => selectedSet.has(id));
+            return normalized.length ? normalized : available;
+        }
+
+        function localizedClassValue(item, key) {
+            if (!item) return '';
+            return item[`${key}_${appState.lang}`] || item[key] || item.id || '';
+        }
+
+        function normalizeRuntimePath(path) {
+            if (path === null || path === undefined) return '';
+            let value = String(path).trim();
+            if (!value) return '';
+
+            if (value.startsWith('file://')) {
+                try {
+                    const url = new URL(value);
+                    if (url.protocol === 'file:') {
+                        value = decodeURIComponent(url.pathname || '');
+                    }
+                } catch (error) {
+                    // Keep the original text if it is not a valid URL.
+                }
+            }
+
+            value = value.replace(/\\/g, '/');
+            const driveMatch = value.match(/^\/?([A-Za-z]):\/(.*)$/);
+            if (driveMatch) {
+                value = `/mnt/${driveMatch[1].toLowerCase()}/${driveMatch[2]}`;
+            }
+            return value;
+        }
+
+        function extensionForPath(path) {
+            path = normalizeRuntimePath(path);
+            if (!path || !path.includes('.')) return '';
+            return path.split('.').pop().toLowerCase();
+        }
+
+        function pathIsVideo(path) {
+            return supportedVideoExtensions.includes(extensionForPath(path));
+        }
+
+        function pathIsImage(path) {
+            return supportedImageExtensions.includes(extensionForPath(path));
+        }
+
+        function formatPathLabel(path) {
+            return normalizeRuntimePath(path) || text('labels.not_selected', 'Not selected');
+        }
+
+        function toggleHidden(node, hidden) {
+            node.classList.toggle('hidden', Boolean(hidden));
+        }
+
+        async function fetchJsonAsset(url) {
+            const response = await fetch(url, { cache: 'no-store' });
+            if (!response.ok) throw new Error(response.statusText);
+            return response.json();
+        }
+
+        async function loadUiManifest() {
+            try {
+                appState.uiConfig = await fetchJsonAsset('config.json');
+            } catch (error) {
+                appState.uiConfig = bundledUiConfig;
+            }
+            dom.appVersion.textContent = 'v' + (appState.uiConfig.version || '1.0');
+            populateUiSelects();
+        }
+
+        async function loadDetectionClassManifest() {
+            try {
+                appState.detectionClassConfig = await fetchJsonAsset('detection_classes.json');
+            } catch (error) {
+                appState.detectionClassConfig = bundledDetectionConfig;
+            }
+            populateClassGroups();
+            appState.detectionGroup = normalizeClassGroup(appState.detectionGroup);
+            const group = activeClassGroup();
+            appState.detectionOutputLabel = group ? (group.output_label || group.id) : 'watermark';
+            appState.detectionTask = group ? (group.task || 'auto') : 'auto';
+            appState.selectedDetectionClasses = normalizeClassSelection(appState.selectedDetectionClasses, group);
+        }
+
+        async function loadLanguagePack(lang) {
+            const safeLang = normalizeLanguageChoice(lang);
+            try {
+                appState.t = await fetchJsonAsset(`lang/${safeLang}.json`);
+            } catch (error) {
+                appState.t = defaultCopy;
+            }
+            appState.lang = safeLang;
+            populateClassGroups();
+            document.documentElement.lang = safeLang === 'zh' ? 'zh' : 'en';
+            document.title = text('app.title', 'Watermark Slayer');
+            applyTranslations();
+            renderApp();
+        }
+
+        function populateUiSelects() {
+            dom.themeSelect.innerHTML = '';
+            appState.uiConfig.themes.forEach(theme => {
+                const option = document.createElement('option');
+                option.value = theme.id;
+                option.textContent = theme.name || theme.id;
+                dom.themeSelect.appendChild(option);
+            });
+
+            dom.langSelect.innerHTML = '';
+            appState.uiConfig.languages.forEach(lang => {
+                const option = document.createElement('option');
+                option.value = lang.id;
+                option.textContent = `${lang.icon ? lang.icon + ' ' : ''}${lang.name || lang.id}`;
+                dom.langSelect.appendChild(option);
+            });
+        }
+
+        function populateClassGroups() {
+            dom.classGroupSelect.innerHTML = '';
+            const groups = appState.detectionClassConfig.groups || [];
+            groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = localizedClassValue(group, 'name') || group.output_label || group.id;
+                dom.classGroupSelect.appendChild(option);
+            });
+        }
+
+        function applyTranslations() {
+            $$('[data-i18n]').forEach(node => {
+                node.textContent = text(node.dataset.i18n, node.textContent);
+            });
+            $$('[data-i18n-placeholder]').forEach(node => {
+                node.placeholder = text(node.dataset.i18nPlaceholder, node.placeholder);
+            });
+            $$('[data-tooltip-key]').forEach(node => {
+                const tooltip = text(node.dataset.tooltipKey, '');
+                if (tooltip) node.dataset.tooltip = tooltip;
+            });
+        }
+
+        function applyThemeChoice(theme) {
+            appState.theme = normalizeThemeChoice(theme);
+            document.body.dataset.theme = appState.theme;
+            dom.themeSelect.value = appState.theme;
+        }
+
+        function collectBridgeState() {
+            return {
+                input_path: normalizeRuntimePath(appState.inputPath),
+                output_path: normalizeRuntimePath(appState.outputPath),
+                overwrite: appState.overwrite,
+                transparent: appState.transparent,
+                max_bbox_percent: appState.detection,
+                force_format: appState.format,
+                mode: appState.mode,
+                detection_prompt: appState.detectionPrompt,
+                detection_group: appState.detectionGroup,
+                detection_classes: appState.selectedDetectionClasses,
+                detection_output_label: appState.detectionOutputLabel,
+                detection_task: appState.detectionTask,
+                florence_model_id: normalizeRuntimePath(appState.florenceTest.modelId),
+                florence_adapter_dir: normalizeRuntimePath(appState.florenceTest.adapterDir),
+                florence_max_new_tokens: parseInt(appState.florenceTest.maxNewTokens, 10) || 256,
+                florence_num_beams: parseInt(appState.florenceTest.numBeams, 10) || 3,
+                florence_use_fast_processor: appState.florenceTest.useFastProcessor,
+                detection_skip: parseInt(appState.detectionSkip, 10) || 1,
+                fade_in: parseFloat(appState.fadeIn) || 0,
+                fade_out: parseFloat(appState.fadeOut) || 0,
+                theme: appState.theme,
+                lang: appState.lang
+            };
+        }
+
+        function queueBridgeStateSave() {
+            if (!appState.configLoaded || !slayerApi()) return;
+            clearTimeout(appState.saveTimer);
+            appState.saveTimer = setTimeout(async () => {
+                try {
+                    await slayerApi().store_ui_state(collectBridgeState());
+                } catch (error) {
+                    console.log('Config save failed:', error);
+                }
+            }, 400);
+        }
+
+        async function restoreBridgeState() {
+            if (!slayerApi()) return false;
+            try {
+                const config = await slayerApi().fetch_ui_state() || {};
+                appState.inputPath = normalizeRuntimePath(config.input_path || '');
+                appState.outputPath = Object.prototype.hasOwnProperty.call(config, 'output_path') ? (normalizeRuntimePath(config.output_path || fallbackOutputPath) || fallbackOutputPath) : fallbackOutputPath;
+                appState.overwrite = Boolean(config.overwrite);
+                appState.transparent = Boolean(config.transparent);
+                appState.detection = Number(config.max_bbox_percent || 100);
+                appState.format = normalizeOutputFormat(config.force_format || 'None');
+                appState.mode = config.mode === 'batch' ? 'batch' : 'single';
+                appState.detectionPrompt = config.detection_prompt || 'watermark';
+                appState.detectionGroup = normalizeClassGroup(config.detection_group || appState.detectionClassConfig.default_group || 'watermark');
+                appState.detectionOutputLabel = config.detection_output_label || (activeClassGroup() && activeClassGroup().output_label) || 'watermark';
+                appState.detectionTask = config.detection_task || (activeClassGroup() && activeClassGroup().task) || 'auto';
+                appState.selectedDetectionClasses = normalizeClassSelection(config.detection_classes || [], activeClassGroup());
+                appState.florenceTest.modelId = Object.prototype.hasOwnProperty.call(config, 'florence_model_id') ? normalizeRuntimePath(config.florence_model_id) : appState.florenceTest.modelId;
+                appState.florenceTest.adapterDir = Object.prototype.hasOwnProperty.call(config, 'florence_adapter_dir') ? normalizeRuntimePath(config.florence_adapter_dir) : appState.florenceTest.adapterDir;
+                appState.florenceTest.maxNewTokens = parseInt(config.florence_max_new_tokens || appState.florenceTest.maxNewTokens, 10);
+                appState.florenceTest.numBeams = parseInt(config.florence_num_beams || appState.florenceTest.numBeams, 10);
+                appState.florenceTest.useFastProcessor = config.florence_use_fast_processor !== false;
+                appState.detectionSkip = parseInt(config.detection_skip || 1, 10);
+                appState.fadeIn = parseFloat(config.fade_in || 0);
+                appState.fadeOut = parseFloat(config.fade_out || 0);
+                applyThemeChoice(config.theme || 'dark');
+                await loadLanguagePack(config.lang || 'zh');
+                appState.configLoaded = true;
+                appendLogLine(text('logs.init', 'Interface ready.'), 'info');
+                renderApp();
+                await loadSourceMedia();
+                return true;
+            } catch (error) {
+                console.log('Config load failed:', error);
+                return false;
+            }
+        }
+
+        function waitForBridgeState() {
+            return new Promise(resolve => {
+                let done = false;
+                const finish = value => {
+                    if (!done) {
+                        done = true;
+                        resolve(value);
+                    }
+                };
+                const attempt = async () => {
+                    const loaded = await restoreBridgeState();
+                    if (loaded) finish(true);
+                };
+                if (slayerApi()) {
+                    attempt();
+                } else {
+                    window.addEventListener('pywebviewready', attempt, { once: true });
+                    setTimeout(() => finish(false), 2500);
+                }
+            });
+        }
+
+        function cacheDom() {
+            [
+                'appVersion', 'themeSelect', 'langSelect', 'modeSingle', 'modeBatch',
+                'inputPath', 'outputPath', 'browseInput', 'browseOutput',
+                'overwriteToggle', 'transparentToggle', 'detectionRange', 'detectionValue',
+                'detectionPrompt', 'formatSelect', 'videoPanel', 'detectionSkip',
+                'classGroupSelect', 'classGroupDescription', 'classOutputLabel', 'classCheckboxes',
+                'detectionSkipValue', 'fadeIn', 'fadeInValue', 'fadeOut', 'fadeOutValue',
+                'startButton', 'stopButton', 'previewButton', 'stageBrowse', 'dropZone',
+                'florenceModelId', 'browseFlorenceModel', 'florenceAdapterDir',
+                'browseFlorenceAdapter', 'florenceMaxTokens', 'florenceNumBeams',
+                'florenceUseFastProcessor', 'selectedTitle', 'selectedSubtitle', 'pathDisplay', 'fileKind',
+                'statusText', 'progressFill', 'progressValue', 'statusMessage',
+                'cudaState', 'ffmpegState', 'ramState', 'gpuState', 'logs', 'clearLogs',
+                'previewModal', 'closePreview', 'closePreviewFooter', 'previewLoading',
+                'previewError', 'previewImage', 'previewPrompt', 'previewCount',
+                'previewSource', 'previewDetections', 'previewGeneratedText',
+                'previewRawPredictions', 'rerunPreview', 'processModal',
+                'closeProcessModal', 'closeProcessModalFooter', 'processBeforeName',
+                'processAfterName', 'processBeforeImage', 'processAfterImage',
+                'processBeforeEmpty', 'processAfterEmpty', 'processModalStatus'
+            ].forEach(id => {
+                dom[id] = document.getElementById(id);
+            });
+        }
+
+        function wireEvents() {
+            dom.themeSelect.addEventListener('change', () => {
+                applyThemeChoice(dom.themeSelect.value);
+                queueBridgeStateSave();
+            });
+            dom.langSelect.addEventListener('change', async () => {
+                await loadLanguagePack(dom.langSelect.value);
+                queueBridgeStateSave();
+            });
+
+            dom.modeSingle.addEventListener('click', () => setInputMode('single'));
+            dom.modeBatch.addEventListener('click', () => setInputMode('batch'));
+
+            dom.inputPath.addEventListener('input', () => {
+                appState.inputPath = normalizeRuntimePath(dom.inputPath.value);
+                appState.compare.after = null;
+                appState.compare.outputPath = '';
+                appState.compare.status = 'waiting';
+                queueBridgeStateSave();
+                renderApp();
+                loadSourceMedia();
+            });
+            dom.outputPath.addEventListener('input', () => {
+                appState.outputPath = normalizeRuntimePath(dom.outputPath.value);
+                queueBridgeStateSave();
+            });
+            dom.browseInput.addEventListener('click', chooseInputPath);
+            dom.browseOutput.addEventListener('click', chooseOutputPath);
+            dom.stageBrowse.addEventListener('click', chooseInputPath);
+            dom.dropZone.addEventListener('click', chooseInputPath);
+            dom.dropZone.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    chooseInputPath();
+                }
+            });
+            dom.dropZone.addEventListener('dragover', event => {
+                event.preventDefault();
+                dom.dropZone.classList.add('dragging');
+            });
+            dom.dropZone.addEventListener('dragleave', () => dom.dropZone.classList.remove('dragging'));
+            dom.dropZone.addEventListener('drop', event => {
+                event.preventDefault();
+                dom.dropZone.classList.remove('dragging');
+                const file = event.dataTransfer.files && event.dataTransfer.files[0];
+                if (file && file.path) {
+                    appState.inputPath = normalizeRuntimePath(file.path);
+                    queueBridgeStateSave();
+                    renderApp();
+                }
+            });
+
+            dom.overwriteToggle.addEventListener('change', () => {
+                appState.overwrite = dom.overwriteToggle.checked;
+                queueBridgeStateSave();
+            });
+            dom.transparentToggle.addEventListener('change', () => {
+                appState.transparent = dom.transparentToggle.checked;
+                queueBridgeStateSave();
+                renderApp();
+            });
+            dom.detectionRange.addEventListener('input', () => {
+                appState.detection = parseInt(dom.detectionRange.value, 10);
+                renderApp();
+            });
+            dom.detectionRange.addEventListener('change', queueBridgeStateSave);
+            dom.detectionPrompt.addEventListener('input', () => {
+                appState.detectionPrompt = dom.detectionPrompt.value;
+                queueBridgeStateSave();
+            });
+            dom.classGroupSelect.addEventListener('change', () => {
+                appState.detectionGroup = normalizeClassGroup(dom.classGroupSelect.value);
+                const group = activeClassGroup();
+                appState.detectionOutputLabel = group ? (group.output_label || group.id) : 'watermark';
+                appState.detectionTask = group ? (group.task || 'auto') : 'auto';
+                appState.selectedDetectionClasses = normalizeClassSelection([], group);
+                queueBridgeStateSave();
+                renderApp();
+            });
+            dom.formatSelect.addEventListener('change', () => {
+                appState.format = normalizeOutputFormat(dom.formatSelect.value);
+                queueBridgeStateSave();
+            });
+            dom.detectionSkip.addEventListener('input', () => {
+                appState.detectionSkip = parseInt(dom.detectionSkip.value, 10);
+                renderApp();
+            });
+            dom.detectionSkip.addEventListener('change', queueBridgeStateSave);
+            dom.fadeIn.addEventListener('input', () => {
+                appState.fadeIn = parseFloat(dom.fadeIn.value);
+                renderApp();
+            });
+            dom.fadeIn.addEventListener('change', queueBridgeStateSave);
+            dom.fadeOut.addEventListener('input', () => {
+                appState.fadeOut = parseFloat(dom.fadeOut.value);
+                renderApp();
+            });
+            dom.fadeOut.addEventListener('change', queueBridgeStateSave);
+
+            dom.startButton.addEventListener('click', launchProcessing);
+            dom.stopButton.addEventListener('click', haltProcessing);
+            dom.previewButton.addEventListener('click', launchPreview);
+            dom.rerunPreview.addEventListener('click', launchPreview);
+            dom.browseFlorenceModel.addEventListener('click', () => chooseFlorencePath('modelId'));
+            dom.browseFlorenceAdapter.addEventListener('click', () => chooseFlorencePath('adapterDir'));
+            dom.florenceModelId.addEventListener('input', () => { appState.florenceTest.modelId = normalizeRuntimePath(dom.florenceModelId.value); queueBridgeStateSave(); });
+            dom.florenceAdapterDir.addEventListener('input', () => { appState.florenceTest.adapterDir = normalizeRuntimePath(dom.florenceAdapterDir.value); queueBridgeStateSave(); });
+            dom.florenceMaxTokens.addEventListener('input', () => { appState.florenceTest.maxNewTokens = parseInt(dom.florenceMaxTokens.value, 10) || 256; queueBridgeStateSave(); });
+            dom.florenceNumBeams.addEventListener('input', () => { appState.florenceTest.numBeams = parseInt(dom.florenceNumBeams.value, 10) || 3; queueBridgeStateSave(); });
+            dom.florenceUseFastProcessor.addEventListener('change', () => { appState.florenceTest.useFastProcessor = dom.florenceUseFastProcessor.checked; queueBridgeStateSave(); });
+            dom.closePreview.addEventListener('click', hidePreviewDialog);
+            dom.closePreviewFooter.addEventListener('click', hidePreviewDialog);
+            dom.previewModal.addEventListener('click', event => {
+                if (event.target === dom.previewModal) hidePreviewDialog();
+            });
+            dom.closeProcessModal.addEventListener('click', hideProcessDialog);
+            dom.closeProcessModalFooter.addEventListener('click', hideProcessDialog);
+            dom.processModal.addEventListener('click', event => {
+                if (event.target === dom.processModal) hideProcessDialog();
+            });
+            dom.clearLogs.addEventListener('click', () => {
+                appState.logs = [];
+                renderLogPanel();
+            });
+        }
+
+        function setInputMode(mode) {
+            appState.mode = mode === 'batch' ? 'batch' : 'single';
+            queueBridgeStateSave();
+            renderApp();
+        }
+
+        async function chooseInputPath() {
+            if (!slayerApi()) {
+                appendLogLine(text('logs.api_error'), 'error');
+                return;
+            }
+            try {
+                const path = appState.mode === 'single'
+                    ? await slayerApi().choose_media_file()
+                    : await slayerApi().choose_directory();
+                if (path) {
+                    appState.inputPath = normalizeRuntimePath(path);
+                    appState.compare.after = null;
+                    appState.compare.outputPath = '';
+                    appState.compare.status = 'waiting';
+                    queueBridgeStateSave();
+                    renderApp();
+                    await loadSourceMedia();
+                }
+            } catch (error) {
+                appendLogLine(error.message, 'error');
+            }
+        }
+
+        async function chooseOutputPath() {
+            if (!slayerApi()) {
+                appendLogLine(text('logs.api_error'), 'error');
+                return;
+            }
+            try {
+                const path = await slayerApi().choose_directory();
+                if (path) {
+                    appState.outputPath = normalizeRuntimePath(path);
+                    queueBridgeStateSave();
+                    renderApp();
+                }
+            } catch (error) {
+                appendLogLine(error.message, 'error');
+            }
+        }
+
+        async function chooseFlorencePath(key) {
+            if (!slayerApi()) {
+                appendLogLine(text('logs.api_error'), 'error');
+                return;
+            }
+            try {
+                const path = await slayerApi().choose_directory();
+                if (path) {
+                    appState.florenceTest[key] = normalizeRuntimePath(path);
+                    queueBridgeStateSave();
+                    renderDetectorSettings();
+                }
+            } catch (error) {
+                appendLogLine(error.message, 'error');
+            }
+        }
+
+        async function launchProcessing() {
+            appState.inputPath = normalizeRuntimePath(appState.inputPath);
+            appState.outputPath = normalizeRuntimePath(appState.outputPath) || fallbackOutputPath;
+            appState.florenceTest.modelId = normalizeRuntimePath(appState.florenceTest.modelId);
+            appState.florenceTest.adapterDir = normalizeRuntimePath(appState.florenceTest.adapterDir);
+
+            if (!appState.inputPath) {
+                appendLogLine(text('logs.no_input'), 'error');
+                return;
+            }
+            if (!slayerApi()) {
+                appendLogLine(text('logs.api_error'), 'error');
+                return;
+            }
+            if (pathIsVideo(appState.inputPath) && appState.transparent) {
+                appState.transparent = false;
+                appendLogLine(text('logs.ghost_video_warning'), 'warning');
+            }
+            if (pathIsVideo(appState.inputPath) && !appState.systemInfo.ffmpeg) {
+                appendLogLine(text('logs.no_ffmpeg'), 'warning');
+            }
+
+            appState.processing = true;
+            appState.progress = 0;
+            appState.statusMsg = text('processing_status.0', text('logs.cooking'));
+            appState.compare.status = 'processing';
+            appState.compare.outputPath = '';
+            appState.compare.liveFrame = null;
+            resetProcessPreview();
+            showProcessDialog();
+            appendLogLine(text('logs.starting'), 'info');
+            appendLogLine(text('logs.first_run_hint'), 'muted');
+            beginStatusTicker();
+            renderApp();
+
+            try {
+                await loadSourceMedia();
+                updateProcessPreviewFromMedia('before', appState.compare.before, text('compare.before'));
+                if (pathIsVideo(appState.inputPath)) {
+                    appState.compare.after = null;
+                    appState.compare.status = 'processing';
+                    renderComparisonPane();
+                } else {
+                    await prepareDetectionPane();
+                }
+                const result = await slayerApi().launch_slayer_job({
+                    input: normalizeRuntimePath(appState.inputPath),
+                    output: normalizeRuntimePath(appState.outputPath),
+                    overwrite: appState.overwrite,
+                    transparent: appState.transparent,
+                    max_bbox: appState.detection,
+                    format: appState.format,
+                    mode: appState.mode,
+                    detection_prompt: appState.detectionPrompt || 'watermark',
+                    detection_group: appState.detectionGroup,
+                    detection_classes: appState.selectedDetectionClasses,
+                    detection_output_label: appState.detectionOutputLabel || 'watermark',
+                    detection_task: appState.detectionTask || 'auto',
+                    florence_model_id: normalizeRuntimePath(appState.florenceTest.modelId),
+                    florence_adapter_dir: normalizeRuntimePath(appState.florenceTest.adapterDir),
+                    florence_max_new_tokens: parseInt(appState.florenceTest.maxNewTokens, 10) || 256,
+                    florence_num_beams: parseInt(appState.florenceTest.numBeams, 10) || 3,
+                    florence_use_fast_processor: appState.florenceTest.useFastProcessor,
+                    detection_skip: parseInt(appState.detectionSkip, 10) || 1,
+                    fade_in: parseFloat(appState.fadeIn) || 0,
+                    fade_out: parseFloat(appState.fadeOut) || 0,
+                    theme: appState.theme,
+                    lang: appState.lang
+                });
+                if (result && result.error) {
+                    appendLogLine(result.error, 'error');
+                    appState.processing = false;
+                    appState.processPreview.status = result.error;
+                    endStatusTicker();
+                    renderApp();
+                }
+            } catch (error) {
+                appendLogLine(error.message, 'error');
+                appState.processing = false;
+                appState.processPreview.status = error.message;
+                endStatusTicker();
+                renderApp();
+            }
+        }
+
+        async function haltProcessing() {
+            if (slayerApi()) {
+                try {
+                    await slayerApi().halt_slayer_job();
+                } catch (error) {
+                    appendLogLine(error.message, 'error');
+                }
+            }
+            appState.processing = false;
+            appState.compare.playing = false;
+            stopFramePlayback();
+            endStatusTicker();
+            appendLogLine(text('logs.stopped'), 'warning');
+            renderApp();
+        }
+
+        async function launchPreview() {
+            appState.inputPath = normalizeRuntimePath(appState.inputPath);
+            appState.florenceTest.modelId = normalizeRuntimePath(appState.florenceTest.modelId);
+            appState.florenceTest.adapterDir = normalizeRuntimePath(appState.florenceTest.adapterDir);
+
+            if (!appState.inputPath) {
+                appendLogLine(text('logs.no_input'), 'error');
+                return;
+            }
+            if (!slayerApi()) {
+                appendLogLine(text('logs.api_error'), 'error');
+                return;
+            }
+
+            appState.preview.loading = true;
+            appState.preview.error = '';
+            appState.preview.image = '';
+            appState.preview.detections = [];
+            appState.preview.generatedText = '';
+            appState.preview.predictionsRaw = [];
+            appState.preview.parsed = null;
+            showPreviewDialog();
+            renderPreviewDialog();
+
+            try {
+                const result = await slayerApi().preview_slayer_detection({
+                    input: normalizeRuntimePath(appState.inputPath),
+                    detection_prompt: appState.detectionPrompt || 'watermark',
+                    detection_group: appState.detectionGroup,
+                    detection_classes: appState.selectedDetectionClasses,
+                    detection_output_label: appState.detectionOutputLabel || 'watermark',
+                    detection_task: appState.detectionTask || 'auto',
+                    florence_model_id: normalizeRuntimePath(appState.florenceTest.modelId),
+                    florence_adapter_dir: normalizeRuntimePath(appState.florenceTest.adapterDir),
+                    florence_max_new_tokens: parseInt(appState.florenceTest.maxNewTokens, 10) || 256,
+                    florence_num_beams: parseInt(appState.florenceTest.numBeams, 10) || 3,
+                    florence_use_fast_processor: appState.florenceTest.useFastProcessor,
+                    max_bbox: appState.detection
+                });
+                if (result.error) {
+                    appState.preview.error = result.error;
+                    appendLogLine(`${text('logs.preview_failed')} ${result.error}`, 'error');
+                } else {
+                    appState.preview.image = result.image;
+                    appState.preview.detections = result.detections || [];
+                    appState.preview.generatedText = result.generated_text || '';
+                    appState.preview.predictionsRaw = result.predictions_raw || [];
+                    appState.preview.parsed = result.parsed || null;
+                    const rawClasses = result.raw_classes || appState.selectedDetectionClasses || [];
+                    appState.preview.prompt = rawClasses.length
+                        ? `${rawClasses.join(', ')} -> ${result.output_label || appState.detectionOutputLabel || 'watermark'}`
+                        : (result.prompt_used || appState.detectionPrompt);
+                    appState.preview.source = result.source || appState.inputPath;
+                    const accepted = appState.preview.detections.filter(item => item.accepted).length;
+                    const total = appState.preview.detections.length;
+                    appendLogLine(text('logs.preview_result').replace('{total}', total).replace('{accepted}', accepted), 'info');
+                }
+            } catch (error) {
+                appState.preview.error = error.message;
+                appendLogLine(`${text('logs.preview_failed')} ${error.message}`, 'error');
+            } finally {
+                appState.preview.loading = false;
+                renderPreviewDialog();
+            }
+        }
+
+        function showPreviewDialog() {
+            toggleHidden(dom.previewModal, false);
+        }
+
+        function hidePreviewDialog() {
+            toggleHidden(dom.previewModal, true);
+        }
+
+        function showProcessDialog() {
+            appState.processPreview.visible = true;
+            renderProcessDialog();
+        }
+
+        function hideProcessDialog() {
+            appState.processPreview.visible = false;
+            renderProcessDialog();
+        }
+
+        function beginStatusTicker() {
+            endStatusTicker();
+            appState.statusTimer = setInterval(() => {
+                const items = Array.isArray(appState.t.processing_status) ? appState.t.processing_status : defaultCopy.processing_status;
+                if (appState.processing && items.length) {
+                    appState.statusMsg = items[Math.floor(Math.random() * items.length)];
+                    renderProgressState();
+                }
+            }, 2500);
+        }
+
+        function endStatusTicker() {
+            if (appState.statusTimer) {
+                clearInterval(appState.statusTimer);
+                appState.statusTimer = null;
+            }
+        }
+
+        function appendLogLine(message, color = 'muted') {
+            const type = logTypeForColor(color);
+            const now = new Date();
+            appState.logs.push({
+                id: appState.logSeq++,
+                time: now.toTimeString().slice(0, 8),
+                message,
+                type
+            });
+            if (appState.logs.length > 150) appState.logs = appState.logs.slice(-150);
+            renderLogPanel();
+        }
+
+        function logTypeForColor(color) {
+            const value = String(color || '').toLowerCase();
+            if (value.includes('error') || value.includes('failed')) return 'error';
+            if (value.includes('warning') || value.includes('yellow')) return 'warning';
+            if (value.includes('green') || value.includes('success') || value.includes('cyan')) return 'success';
+            if (value.includes('info')) return 'info';
+            return 'muted';
+        }
+
+        function renderApp() {
+            dom.themeSelect.value = appState.theme;
+            dom.langSelect.value = appState.lang;
+            dom.inputPath.value = normalizeRuntimePath(appState.inputPath);
+            dom.outputPath.value = normalizeRuntimePath(appState.outputPath);
+            dom.overwriteToggle.checked = appState.overwrite;
+            dom.transparentToggle.checked = appState.transparent;
+            dom.detectionRange.value = appState.detection;
+            dom.detectionValue.textContent = `${appState.detection}%`;
+            dom.detectionPrompt.value = appState.detectionPrompt;
+            renderClassSelectors();
+            dom.formatSelect.value = appState.format;
+            dom.detectionSkip.value = appState.detectionSkip;
+            dom.detectionSkipValue.textContent = appState.detectionSkip;
+            dom.fadeIn.value = appState.fadeIn;
+            dom.fadeInValue.textContent = Number(appState.fadeIn).toFixed(1).replace('.0', '');
+            dom.fadeOut.value = appState.fadeOut;
+            dom.fadeOutValue.textContent = Number(appState.fadeOut).toFixed(1).replace('.0', '');
+
+            dom.modeSingle.classList.toggle('active', appState.mode === 'single');
+            dom.modeBatch.classList.toggle('active', appState.mode === 'batch');
+            toggleHidden(dom.videoPanel, !pathIsVideo(appState.inputPath));
+
+            dom.startButton.disabled = appState.processing || !appState.inputPath;
+            dom.stopButton.disabled = !appState.processing;
+            dom.previewButton.disabled = appState.processing || !appState.inputPath;
+            dom.startButton.textContent = appState.processing ? text('buttons.start_processing') : text('buttons.start');
+
+            renderSourceSummary();
+            renderDetectorSettings();
+            renderComparisonPane();
+            renderProgressState();
+            renderSystemState();
+            renderPreviewDialog();
+            renderProcessDialog();
+        }
+
+        function renderSourceSummary() {
+            const path = normalizeRuntimePath(appState.inputPath);
+            dom.pathDisplay.textContent = formatPathLabel(path);
+            if (!path) {
+                dom.selectedTitle.textContent = text('dropzone.title');
+                dom.selectedSubtitle.textContent = text('dropzone.subtitle');
+                dom.fileKind.textContent = text('labels.ready');
+                return;
+            }
+            dom.selectedTitle.textContent = path.split(/[\\/]/).pop() || path;
+            dom.selectedSubtitle.textContent = path;
+            if (pathIsVideo(path)) {
+                dom.fileKind.textContent = text('dropzone.video_hint');
+            } else if (pathIsImage(path)) {
+                dom.fileKind.textContent = text('dropzone.image_hint');
+            } else {
+                dom.fileKind.textContent = appState.mode === 'batch' ? text('dropzone.folder_hint') : text('labels.ready');
+            }
+        }
+
+        function renderClassSelectors() {
+            const group = activeClassGroup();
+            dom.classGroupSelect.value = appState.detectionGroup;
+            dom.classCheckboxes.innerHTML = '';
+
+            if (!group) {
+                dom.classGroupDescription.textContent = text('classes.empty');
+                dom.classOutputLabel.textContent = 'watermark';
+                return;
+            }
+
+            appState.detectionOutputLabel = group.output_label || group.id || 'watermark';
+            appState.detectionTask = group.task || appState.detectionTask || 'auto';
+            dom.classOutputLabel.textContent = appState.detectionOutputLabel;
+            dom.classGroupDescription.textContent = localizedClassValue(group, 'description') || text('classes.hint');
+
+            const classes = Array.isArray(group.classes) ? group.classes : [];
+            if (!classes.length) {
+                dom.classCheckboxes.textContent = text('classes.empty');
+                return;
+            }
+
+            const selected = new Set(appState.selectedDetectionClasses);
+            classes.forEach(item => {
+                const classId = item.id || item;
+                const label = localizedClassValue(item, 'name') || classId;
+                const row = document.createElement('label');
+                row.className = 'class-chip';
+                row.innerHTML = '<input type="checkbox"><span></span><code></code>';
+                const checkbox = row.querySelector('input');
+                checkbox.checked = selected.has(classId);
+                row.querySelector('span').textContent = label;
+                row.querySelector('code').textContent = classId;
+                checkbox.addEventListener('change', () => {
+                    const next = new Set(appState.selectedDetectionClasses);
+                    if (checkbox.checked) {
+                        next.add(classId);
+                    } else {
+                        next.delete(classId);
+                    }
+                    appState.selectedDetectionClasses = classGroupIds(group).filter(id => next.has(id));
+                    queueBridgeStateSave();
+                    renderClassSelectors();
+                });
+                dom.classCheckboxes.appendChild(row);
+            });
+        }
+
+        function renderDetectorSettings() {
+            dom.florenceModelId.value = normalizeRuntimePath(appState.florenceTest.modelId);
+            dom.florenceAdapterDir.value = normalizeRuntimePath(appState.florenceTest.adapterDir);
+            dom.florenceMaxTokens.value = appState.florenceTest.maxNewTokens;
+            dom.florenceNumBeams.value = appState.florenceTest.numBeams;
+            dom.florenceUseFastProcessor.checked = appState.florenceTest.useFastProcessor;
+        }
+
+        function mediaSourceUrl(media) {
+            if (!media) return '';
+            if (media.kind === 'image' && media.data) {
+                return media.data_url || `data:${media.mime || 'image/png'};base64,${media.data}`;
+            }
+            if (media.kind === 'image' && media.url) return media.url;
+            if (media.kind === 'video' && media.url) {
+                return media.url;
+            }
+            return '';
+        }
+
+        function supportsFramePlayback(media) {
+            return Boolean(media && media.kind === 'video' && media.frame_url_template && Number(media.frame_count || 0) > 0);
+        }
+
+        function frameSourceUrl(media) {
+            if (!supportsFramePlayback(media)) return '';
+            const frameCount = Math.max(1, Number(media.frame_count || 1));
+            const frameIndex = Math.max(0, Math.min(frameCount - 1, Math.round((appState.compare.timeline / 1000) * (frameCount - 1))));
+            const version = media.mtime_ns ? `?v=${media.mtime_ns}` : '';
+            return `${media.frame_url_template.replace('{frame}', String(frameIndex))}${version}`;
+        }
+
+        function imageOnlySource(media) {
+            if (!media) return '';
+            if (media.kind === 'image') return mediaSourceUrl(media);
+            if (media.kind === 'video') {
+                return media.poster_data_url
+                    || (media.poster_data ? `data:${media.poster_mime || 'image/jpeg'};base64,${media.poster_data}` : '')
+                    || frameSourceUrl(media);
+            }
+            return '';
+        }
+
+        function hasFrameComparison() {
+            return supportsFramePlayback(appState.compare.before) && supportsFramePlayback(appState.compare.after);
+        }
+
+        function stopFramePlayback() {
+            if (framePlaybackRequest) {
+                cancelAnimationFrame(framePlaybackRequest);
+                framePlaybackRequest = null;
+            }
+        }
+
+        function resetProcessPreview() {
+            appState.processPreview.beforeSrc = '';
+            appState.processPreview.afterSrc = '';
+            appState.processPreview.beforeName = '-';
+            appState.processPreview.afterName = '-';
+            appState.processPreview.status = text('process_modal.waiting');
+        }
+
+        function setProcessPreviewSide(side, src, name) {
+            if (!src) return;
+            const key = side === 'before' ? 'before' : 'after';
+            appState.processPreview[`${key}Src`] = src;
+            appState.processPreview[`${key}Name`] = name || text(`compare.${key}`);
+            renderProcessDialog();
+        }
+
+        function updateProcessPreviewFromMedia(side, media, fallbackName) {
+            const src = imageOnlySource(media);
+            const name = media && (media.name || formatPathLabel(media.path)) || fallbackName;
+            setProcessPreviewSide(side, src, name);
+        }
+
+        function renderProcessDialog() {
+            if (!dom.processModal) return;
+            toggleHidden(dom.processModal, !appState.processPreview.visible);
+
+            const beforeSrc = appState.processPreview.beforeSrc;
+            const afterSrc = appState.processPreview.afterSrc;
+            toggleHidden(dom.processBeforeImage, !beforeSrc);
+            toggleHidden(dom.processBeforeEmpty, Boolean(beforeSrc));
+            toggleHidden(dom.processAfterImage, !afterSrc);
+            toggleHidden(dom.processAfterEmpty, Boolean(afterSrc));
+
+            if (beforeSrc && dom.processBeforeImage.src !== beforeSrc) {
+                dom.processBeforeImage.src = beforeSrc;
+            }
+            if (afterSrc && dom.processAfterImage.src !== afterSrc) {
+                dom.processAfterImage.src = afterSrc;
+            }
+
+            dom.processBeforeName.textContent = appState.processPreview.beforeName || '-';
+            dom.processAfterName.textContent = appState.processPreview.afterName || '-';
+            dom.processModalStatus.textContent = appState.processPreview.status || text('process_modal.waiting');
+        }
+
+        function renderMediaPane(media, imgEl, videoEl, emptyEl) {
+            const src = mediaSourceUrl(media);
+            const isImage = media && media.kind === 'image' && src;
+            const isVideo = media && media.kind === 'video' && src;
+            const isFrameVideo = supportsFramePlayback(media);
+            const posterSrc = isVideo && (media.poster_data_url || (media.poster_data ? `data:${media.poster_mime || 'image/jpeg'};base64,${media.poster_data}` : ''));
+            const showPoster = isVideo && posterSrc;
+            const frameSrc = isFrameVideo ? frameSourceUrl(media) : '';
+
+            toggleHidden(imgEl, !(isImage || showPoster || frameSrc));
+            toggleHidden(videoEl, true);
+            toggleHidden(emptyEl, Boolean(isImage || isVideo || showPoster || frameSrc));
+
+            if (isImage) {
+                imgEl.onerror = () => {
+                    if (media.url && imgEl.src !== media.url) {
+                        imgEl.src = media.url;
+                    }
+                };
+                imgEl.src = src;
+                imgEl.dataset.loaded = 'pending';
+                imgEl.onload = () => {
+                    imgEl.dataset.loaded = 'ok';
+                };
+            }
+            if (frameSrc) {
+                videoEl.pause();
+                videoEl.removeAttribute('src');
+                videoEl.dataset.src = '';
+                if (imgEl.dataset.src !== frameSrc) {
+                    imgEl.onerror = () => {
+                        if (posterSrc && imgEl.src !== posterSrc) imgEl.src = posterSrc;
+                    };
+                    imgEl.src = frameSrc;
+                    imgEl.dataset.src = frameSrc;
+                    imgEl.dataset.loaded = 'frame';
+                }
+                return;
+            }
+            if (isVideo && videoEl.dataset.src !== src) {
+                videoEl.pause();
+                if (posterSrc) {
+                    imgEl.src = posterSrc;
+                    imgEl.dataset.loaded = 'poster';
+                    videoEl.poster = posterSrc;
+                }
+                videoEl.onerror = () => {
+                    appendLogLine(`Video failed to load: ${media.path || media.name || src}`, 'warning');
+                    toggleHidden(videoEl, true);
+                    toggleHidden(imgEl, !posterSrc);
+                };
+                videoEl.onloadedmetadata = () => {
+                    if (Number.isFinite(videoEl.duration) && videoEl.duration > 0) {
+                        videoEl.currentTime = 0;
+                    }
+                };
+                videoEl.onloadeddata = () => {
+                    toggleHidden(imgEl, true);
+                    toggleHidden(videoEl, false);
+                };
+                videoEl.src = src;
+                videoEl.dataset.src = src;
+                videoEl.load();
+            }
+            if (isVideo && videoEl.dataset.src === src && videoEl.readyState >= 2) {
+                toggleHidden(imgEl, true);
+                toggleHidden(videoEl, false);
+            }
+        }
+
+        function renderComparisonPane() {
+            // Main-page before/after UI was removed; live images now render in processModal.
+        }
+
+        async function loadSourceMedia() {
+            appState.inputPath = normalizeRuntimePath(appState.inputPath);
+            if (!slayerApi() || !appState.inputPath || (!pathIsImage(appState.inputPath) && !pathIsVideo(appState.inputPath))) {
+                appState.compare.before = null;
+                renderComparisonPane();
+                return;
+            }
+            try {
+                const media = await slayerApi().fetch_media_payload(appState.inputPath);
+                if (!media.error) {
+                    appState.compare.before = media;
+                    if (appState.processPreview.visible) {
+                        updateProcessPreviewFromMedia('before', media, text('compare.before'));
+                    }
+                } else {
+                    appendLogLine(media.error, 'warning');
+                }
+            } catch (error) {
+                appendLogLine(error.message, 'warning');
+            }
+            renderComparisonPane();
+        }
+
+        async function prepareDetectionPane() {
+            appState.inputPath = normalizeRuntimePath(appState.inputPath);
+            appState.florenceTest.modelId = normalizeRuntimePath(appState.florenceTest.modelId);
+            appState.florenceTest.adapterDir = normalizeRuntimePath(appState.florenceTest.adapterDir);
+            if (!slayerApi() || !appState.inputPath || (!pathIsImage(appState.inputPath) && !pathIsVideo(appState.inputPath))) return;
+
+            appState.compare.status = 'detecting';
+            appState.compare.after = null;
+            renderComparisonPane();
+
+            try {
+                const result = await slayerApi().preview_slayer_detection({
+                    input: normalizeRuntimePath(appState.inputPath),
+                    detection_prompt: appState.detectionPrompt || 'watermark',
+                    detection_group: appState.detectionGroup,
+                    detection_classes: appState.selectedDetectionClasses,
+                    detection_output_label: appState.detectionOutputLabel || 'watermark',
+                    detection_task: appState.detectionTask || 'auto',
+                    florence_model_id: normalizeRuntimePath(appState.florenceTest.modelId),
+                    florence_adapter_dir: normalizeRuntimePath(appState.florenceTest.adapterDir),
+                    florence_max_new_tokens: parseInt(appState.florenceTest.maxNewTokens, 10) || 256,
+                    florence_num_beams: parseInt(appState.florenceTest.numBeams, 10) || 3,
+                    florence_use_fast_processor: appState.florenceTest.useFastProcessor,
+                    max_bbox: appState.detection
+                });
+                if (!result.error && result.image) {
+                    appState.compare.after = {
+                        kind: 'image',
+                        mime: 'image/png',
+                        data: result.image,
+                        name: text('compare.detecting'),
+                        path: result.source || appState.inputPath
+                    };
+                    updateProcessPreviewFromMedia('after', appState.compare.after, text('compare.detecting'));
+                    appState.compare.status = 'processing';
+                } else if (result.error) {
+                    appendLogLine(`${text('logs.preview_failed')} ${result.error}`, 'warning');
+                    appState.compare.status = 'processing';
+                }
+            } catch (error) {
+                appendLogLine(`${text('logs.preview_failed')} ${error.message}`, 'warning');
+                appState.compare.status = 'processing';
+            }
+            renderComparisonPane();
+        }
+
+        function applyProcessedMedia(media) {
+            if (!media || media.error) return;
+            stopFramePlayback();
+            media.path = normalizeRuntimePath(media.path || '');
+            appState.compare.after = media;
+            appState.compare.outputPath = media.path || '';
+            appState.compare.status = 'done';
+            appState.compare.timeline = 0;
+            appState.compare.playing = false;
+            renderComparisonPane();
+            updateProcessPreviewFromMedia('after', media, text('compare.after'));
+            appState.processPreview.status = text('logs.done');
+            renderProcessDialog();
+            applyPlaybackRate();
+        }
+
+        function formatLiveFrameText(key, payload) {
+            const frame = payload && payload.frame ? payload.frame : '-';
+            const total = payload && payload.total_frames ? payload.total_frames : '-';
+            return text(key).replace('{frame}', frame).replace('{total}', total);
+        }
+
+        function liveFrameMedia(source, payload, side) {
+            if (!source || !source.data) return null;
+            return {
+                kind: 'image',
+                mime: source.mime || 'image/jpeg',
+                data: source.data,
+                data_url: source.data_url || '',
+                name: formatLiveFrameText(side === 'before' ? 'compare.before_frame' : 'compare.after_frame', payload),
+                path: appState.inputPath
+            };
+        }
+
+        function applyLiveProcessingFrame(payload) {
+            if (!payload) return;
+            stopFramePlayback();
+            appState.compare.playing = false;
+            appState.compare.liveFrame = payload;
+
+            const before = liveFrameMedia(payload.before, payload, 'before');
+            const after = liveFrameMedia(payload.after, payload, 'after');
+            if (before) {
+                appState.compare.before = before;
+                updateProcessPreviewFromMedia('before', before, before.name);
+            }
+            if (after) {
+                appState.compare.after = after;
+                updateProcessPreviewFromMedia('after', after, after.name);
+            }
+
+            const isProcessed = payload.phase === 'processed';
+            appState.compare.status = isProcessed ? 'frame_processed' : 'frame_detected';
+            appState.statusMsg = formatLiveFrameText(isProcessed ? 'compare.live_processed' : 'compare.live_detected', payload);
+            appState.processPreview.status = appState.statusMsg;
+
+            if (payload.total_frames) {
+                appState.compare.timeline = Math.max(0, Math.min(1000, Math.round(((payload.frame || 0) / payload.total_frames) * 1000)));
+            }
+            renderProcessDialog();
+            renderComparisonPane();
+            renderProgressState();
+        }
+
+        function comparisonDuration() {
+            const mediaDurations = [appState.compare.before, appState.compare.after]
+                .filter(item => item && item.kind === 'video')
+                .map(item => Number(item.duration || 0))
+                .filter(value => Number.isFinite(value) && value > 0);
+            return mediaDurations.length ? Math.min(...mediaDurations) : 0;
+        }
+
+        function applyPlaybackRate() {
+            // Native video controls were removed from the main page.
+        }
+
+        function startFramePlayback() {
+            stopFramePlayback();
+            appState.compare.playing = true;
+            let previousTime = performance.now();
+
+            const tick = now => {
+                if (!appState.compare.playing || !hasFrameComparison()) {
+                    stopFramePlayback();
+                    appState.compare.playing = false;
+                    renderComparisonPane();
+                    return;
+                }
+
+                const duration = comparisonDuration();
+                if (!duration) {
+                    stopFramePlayback();
+                    appState.compare.playing = false;
+                    renderComparisonPane();
+                    return;
+                }
+
+                const speed = parseFloat(appState.compare.speed) || 1;
+                const elapsed = Math.max(0, now - previousTime) / 1000;
+                previousTime = now;
+                appState.compare.timeline += (elapsed * speed / duration) * 1000;
+
+                if (appState.compare.timeline >= 1000) {
+                    appState.compare.timeline = 1000;
+                    appState.compare.playing = false;
+                    stopFramePlayback();
+                    renderComparisonPane();
+                    return;
+                }
+
+                renderComparisonPane();
+                framePlaybackRequest = requestAnimationFrame(tick);
+            };
+
+            framePlaybackRequest = requestAnimationFrame(tick);
+        }
+
+        function togglePlayback() {
+            if (hasFrameComparison()) {
+                if (appState.compare.playing) {
+                    appState.compare.playing = false;
+                    stopFramePlayback();
+                } else {
+                    if (appState.compare.timeline >= 1000) appState.compare.timeline = 0;
+                    startFramePlayback();
+                }
+                renderComparisonPane();
+                return;
+            }
+        }
+
+        function seekComparison() {
+            if (hasFrameComparison()) {
+                renderComparisonPane();
+            }
+        }
+
+        function syncPlaybackTimeline() {
+            // Native video controls were removed from the main page.
+        }
+
+        function renderProgressState() {
+            const progress = Math.max(0, Math.min(100, Number(appState.progress || 0)));
+            dom.progressFill.style.width = `${progress}%`;
+            dom.progressValue.textContent = `${progress}%`;
+            dom.statusText.textContent = appState.processing ? text('logs.cooking') : text('labels.idle');
+            dom.statusMessage.textContent = appState.statusMsg || text('labels.ready');
+        }
+
+        function renderSystemState() {
+            dom.cudaState.textContent = appState.systemInfo.cuda ? text('status_bar.on') : text('status_bar.off');
+            dom.cudaState.className = appState.systemInfo.cuda ? 'ok' : 'warn';
+            dom.ffmpegState.textContent = appState.systemInfo.ffmpeg ? text('status_bar.on') : text('status_bar.off');
+            dom.ffmpegState.className = appState.systemInfo.ffmpeg ? 'ok' : 'warn';
+            dom.ramState.textContent = appState.systemInfo.ram ? `${Math.round(appState.systemInfo.ram)}%` : '--';
+            dom.gpuState.textContent = appState.systemInfo.gpu || text('status_bar.cpu_mode');
+        }
+
+        function renderLogPanel() {
+            dom.logs.innerHTML = '';
+            appState.logs.forEach(item => {
+                const row = document.createElement('div');
+                row.className = `log-row ${item.type}`;
+                row.innerHTML = `<span>${item.time}</span><p></p>`;
+                row.querySelector('p').textContent = item.message;
+                dom.logs.appendChild(row);
+            });
+            dom.logs.scrollTop = dom.logs.scrollHeight;
+        }
+
+        function renderPreviewDialog() {
+            toggleHidden(dom.previewLoading, !appState.preview.loading);
+            toggleHidden(dom.previewError, !appState.preview.error);
+            toggleHidden(dom.previewImage, !appState.preview.image);
+
+            if (appState.preview.error) {
+                dom.previewError.textContent = appState.preview.error;
+            }
+            if (appState.preview.image) {
+                dom.previewImage.src = `data:image/png;base64,${appState.preview.image}`;
+            }
+
+            dom.previewPrompt.textContent = appState.preview.prompt || appState.detectionPrompt || '-';
+            dom.previewCount.textContent = appState.preview.detections.length;
+            dom.previewSource.textContent = appState.preview.source || appState.inputPath || '-';
+            dom.previewDetections.innerHTML = '';
+            dom.previewGeneratedText.textContent = appState.preview.generatedText || '';
+            dom.previewRawPredictions.textContent = JSON.stringify({
+                predictions_raw: appState.preview.predictionsRaw || [],
+                parsed: appState.preview.parsed
+            }, null, 2);
+
+            appState.preview.detections.forEach((det, index) => {
+                const row = document.createElement('div');
+                row.className = `bbox-row ${det.accepted ? 'accepted' : 'skipped'}`;
+                const area = typeof det.area_percent === 'number' ? det.area_percent : '-';
+                row.innerHTML = `
+                    <span>#${index + 1}</span>
+                    <code>${Array.isArray(det.bbox) ? det.bbox.join(', ') : '-'}</code>
+                    <strong>${det.raw_label || det.query_label || '-'} -> ${det.output_label || appState.detectionOutputLabel || 'watermark'}</strong>
+                    <strong>${area}${text('preview_modal.of_image')}</strong>
+                    <em></em>
+                `;
+                row.querySelector('em').textContent = det.accepted ? text('status_bar.on') : text('preview_modal.too_large');
+                dom.previewDetections.appendChild(row);
+            });
+        }
+
+        async function loadCapabilityInfo() {
+            if (!slayerApi()) {
+                setTimeout(loadCapabilityInfo, 800);
+                return;
+            }
+            try {
+                const info = await slayerApi().fetch_capability_snapshot();
+                appState.systemInfo.cuda = Boolean(info.cuda);
+                appState.systemInfo.gpu = info.gpu_name || text('status_bar.cpu_mode');
+                appState.systemInfo.ffmpeg = Boolean(info.ffmpeg);
+                renderSystemState();
+            } catch (error) {
+                setTimeout(loadCapabilityInfo, 1000);
+            }
+        }
+
+        async function updateResourceInfo() {
+            if (!slayerApi()) return;
+            try {
+                const info = await slayerApi().fetch_usage_snapshot();
+                appState.systemInfo.ram = Number(info.ram_percent || 0);
+                renderSystemState();
+            } catch (error) {
+                // Dynamic info is optional.
+            }
+        }
+
+        function registerBridgeCallbacks() {
+            window.updateProgress = percent => {
+                appState.progress = parseInt(percent, 10) || 0;
+                renderProgressState();
+            };
+            window.addLog = (message, color) => {
+                appendLogLine(message, color);
+            };
+            window.processingOutput = media => {
+                applyProcessedMedia(media);
+            };
+            window.processingFrame = payload => {
+                applyLiveProcessingFrame(payload);
+            };
+            window.processingOutputPath = async path => {
+                path = normalizeRuntimePath(path);
+                if (!slayerApi() || !path) return;
+                try {
+                    const media = await slayerApi().fetch_media_payload(path);
+                    if (media && media.kind === 'video' && pathIsVideo(appState.inputPath)) {
+                        const source = await slayerApi().fetch_media_payload(appState.inputPath);
+                        if (source && !source.error) {
+                            appState.compare.before = source;
+                            updateProcessPreviewFromMedia('before', source, text('compare.before'));
+                        }
+                    }
+                    applyProcessedMedia(media);
+                } catch (error) {
+                    appendLogLine(error.message, 'warning');
+                }
+            };
+            window.processingComplete = () => {
+                appState.processing = false;
+                appState.compare.playing = false;
+                stopFramePlayback();
+                appState.progress = 100;
+                appState.compare.status = appState.compare.outputPath ? 'done' : 'waiting';
+                appState.statusMsg = text('logs.done');
+                appState.processPreview.status = text('logs.done');
+                endStatusTicker();
+                appendLogLine(text('logs.done'), 'success');
+                renderApp();
+            };
+        }
+
+        async function bootApp() {
+            cacheDom();
+            registerBridgeCallbacks();
+            await loadUiManifest();
+            await loadDetectionClassManifest();
+            wireEvents();
+            applyThemeChoice('dark');
+            await loadLanguagePack('zh');
+
+            const loaded = await waitForBridgeState();
+            if (!loaded) {
+                appState.configLoaded = false;
+                appendLogLine(text('logs.api_error'), 'warning');
+                renderApp();
+            }
+
+            loadCapabilityInfo();
+            updateResourceInfo();
+            setInterval(updateResourceInfo, 3000);
+        }
+
+        document.addEventListener('DOMContentLoaded', bootApp);
+    </script>
+</body>
+</html>

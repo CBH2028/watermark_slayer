@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "default_group": "watermark",
+  "groups": [
+    {
+      "id": "watermark",
+      "name": "Watermark",
+      "name_zh": "水印",
+      "name_en": "Watermark",
+      "output_label": "watermark",
+      "task": "od",
+      "description": "Merge raw Florence-2 watermark labels into one output category.",
+      "description_zh": "把 Florence-2 输出的原始水印类别合并为一个输出类别。",
+      "description_en": "Merge raw Florence-2 watermark labels into one output category.",
+      "classes": [
+        {
+          "id": "wm_sd",
+          "name": "SD Watermark",
+          "name_zh": "SD 水印",
+          "name_en": "SD Watermark"
+        },
+        {
+          "id": "wm_blur",
+          "name": "Blur Watermark",
+          "name_zh": "模糊水印",
+          "name_en": "Blur Watermark"
+        }
+      ]
+    }
+  ]
+}

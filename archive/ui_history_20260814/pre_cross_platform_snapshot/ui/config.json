@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "themes": [
+    { "id": "dark", "name": "Dark" },
+    { "id": "light", "name": "Light" }
+  ],
+  "languages": [
+    { "id": "zh", "icon": "CN", "name": "中文", "randomizable": false },
+    { "id": "en", "icon": "EN", "name": "English", "randomizable": false }
+  ]
+}

@@ -1,0 +1,195 @@
+{
+  "app": {
+    "title": "Watermark Slayer",
+    "subtitle": "本地 AI 水印检测与修复工具"
+  },
+  "sections": {
+    "input": "输入",
+    "output": "输出",
+    "settings": "处理参数",
+    "classes": "类别映射",
+    "video": "视频参数",
+    "system": "系统状态",
+    "logs": "运行日志",
+    "preview": "检测预览"
+  },
+  "modes": {
+    "label": "处理模式",
+    "single": "单文件",
+    "single_tooltip": "处理一个图片或视频文件。",
+    "batch": "批量",
+    "batch_tooltip": "处理一个文件夹内的图片和视频。"
+  },
+  "settings": {
+    "gaslight": {
+      "label": "覆盖已有输出",
+      "sublabel": "",
+      "tooltip": "输出文件已存在时允许覆盖。"
+    },
+    "ghost": {
+      "label": "透明模式",
+      "sublabel": "仅图片",
+      "tooltip": "把检测区域转为透明，而不是进行修复。"
+    },
+    "sigma_detect": {
+      "label": "最大检测面积",
+      "tooltip": "超过该画面占比的检测框会被跳过。"
+    },
+    "detection_prompt": {
+      "label": "检测目标",
+      "placeholder": "watermark",
+      "tooltip": "告诉模型需要检测的内容，例如 watermark、logo、text。"
+    },
+    "output_format": {
+      "label": "输出格式",
+      "tooltip": "自动模式会尽量沿用原始格式。",
+      "auto": "自动",
+      "png": "PNG",
+      "jpg": "JPG",
+      "webp": "WEBP",
+      "mp4": "MP4",
+      "avi": "AVI"
+    }
+  },
+  "video_settings": {
+    "title": "视频参数",
+    "detection_skip": {
+      "label": "检测间隔",
+      "unit": "帧",
+      "hint": "数值越高越快，但可能漏掉短暂出现的水印。"
+    },
+    "fade_in": {
+      "label": "前向缓冲",
+      "hint": "向前扩展遮罩时间。"
+    },
+    "fade_out": {
+      "label": "后向缓冲",
+      "hint": "向后扩展遮罩时间。"
+    }
+  },
+  "classes": {
+    "title": "类别映射",
+    "group": "统合类别",
+    "raw_classes": "模型输出类别",
+    "output_label": "输出类别",
+    "fallback_prompt": "备用检测词",
+    "empty": "没有可用类别，请检查 detection_classes.json。",
+    "hint": "选中的模型输出类别会用于生成修复遮罩。"
+  },
+  "model_settings": {
+    "title": "Florence 模型",
+    "model_id": "模型目录",
+    "adapter_dir": "Adapter 目录",
+    "max_new_tokens": "最大 token",
+    "num_beams": "Beam 数",
+    "use_fast_processor": "Fast processor"
+  },
+  "compare": {
+    "title": "去水印前后对比",
+    "subtitle": "检测预览和处理结果会在这里并排显示。",
+    "waiting": "等待",
+    "detecting": "检测预览",
+    "processing": "处理中",
+    "frame_detected": "Florence 当前帧检测完成",
+    "frame_processed": "iopaint 当前帧修复完成",
+    "done": "处理完成",
+    "before": "处理前",
+    "after": "处理后",
+    "before_empty": "请选择图片或视频。",
+    "after_empty": "检测框预览或处理结果会显示在这里。",
+    "before_frame": "第 {frame}/{total} 帧 · Florence 检测框",
+    "after_frame": "第 {frame}/{total} 帧 · iopaint 结果",
+    "live_detected": "Florence 已检测第 {frame}/{total} 帧",
+    "live_processed": "iopaint 已修复第 {frame}/{total} 帧",
+    "play": "播放",
+    "pause": "暂停",
+    "progress": "进度",
+    "speed": "速度"
+  },
+  "buttons": {
+    "preview": "预览检测",
+    "preview_tooltip": "先查看模型检测到的区域。",
+    "preview_loading": "检测中...",
+    "start": "开始处理",
+    "start_processing": "处理中...",
+    "stop": "停止",
+    "browse": "选择",
+    "select_input": "选择输入",
+    "select_output": "选择输出",
+    "try_again": "重新检测",
+    "close": "关闭",
+    "copy_error": "复制错误"
+  },
+  "dropzone": {
+    "title": "选择要处理的文件或文件夹",
+    "subtitle": "支持图片、视频和批量目录",
+    "video_hint": "视频文件",
+    "image_hint": "图片文件",
+    "folder_hint": "批量目录"
+  },
+  "output": {
+    "placeholder": "默认输出到输入所在目录"
+  },
+  "status_bar": {
+    "cuda": "CUDA",
+    "ffmpeg": "FFmpeg",
+    "ram": "内存",
+    "on": "可用",
+    "off": "不可用",
+    "cpu_mode": "CPU 模式"
+  },
+  "preview_modal": {
+    "title": "检测预览",
+    "prompt": "检测目标:",
+    "detected": "检测结果:",
+    "source": "来源:",
+    "regions": "个区域",
+    "bounding_boxes": "检测框",
+    "generated_text": "Florence 原始生成文本",
+    "predictions_raw": "原始 OD 结果",
+    "of_image": "% 画面",
+    "too_large": "已跳过",
+    "loading": "正在检测...",
+    "loading_hint": "首次运行可能需要下载模型。"
+  },
+  "process_modal": {
+    "eyebrow": "处理预览",
+    "title": "实时处理前后图",
+    "waiting": "等待处理帧...",
+    "before_empty": "等待当前处理前帧。",
+    "after_empty": "等待当前处理后帧。"
+  },
+  "processing_status": [
+    "准备模型...",
+    "检测水印区域...",
+    "生成修复遮罩...",
+    "执行图像修复...",
+    "写入输出文件..."
+  ],
+  "logs": {
+    "init": "界面已就绪。",
+    "starting": "开始处理任务。",
+    "first_run_hint": "首次运行可能需要下载模型文件。",
+    "done": "处理完成。",
+    "stopped": "任务已停止。",
+    "no_input": "请先选择输入路径。",
+    "ghost_video_warning": "视频不支持透明模式，已自动关闭。",
+    "no_ffmpeg": "未检测到 FFmpeg，视频输出可能不包含音频。",
+    "api_error": "后端 API 不可用，请通过 run.sh 或 run.bat 启动。",
+    "preview_failed": "预览失败:",
+    "preview_result": "检测到 {total} 个区域，其中 {accepted} 个会被处理。",
+    "cooking": "正在处理..."
+  },
+  "labels": {
+    "theme": "主题",
+    "language": "语言",
+    "input_path": "输入路径",
+    "output_path": "输出路径",
+    "current_file": "当前输入",
+    "idle": "等待任务",
+    "progress": "进度",
+    "ready": "就绪",
+    "not_selected": "未选择",
+    "api_unavailable": "API 未连接"
+  }
+}

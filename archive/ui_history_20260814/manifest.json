@@ -1,0 +1,272 @@
+{
+  "archive_name": "ui_history_20260814",
+  "created_at": "2026-08-14T11:56:40+08:00",
+  "policy": "The active UI was copied as a pre-cross-platform snapshot. Historical original UI files were moved without deletion.",
+  "entry_count": 21,
+  "file_count": 31,
+  "total_size_bytes": 9667309,
+  "entries": [
+    {
+      "operation": "copy",
+      "source": "README.md",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/README.md"
+    },
+    {
+      "operation": "copy",
+      "source": "download.sh",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/download.sh"
+    },
+    {
+      "operation": "copy",
+      "source": "requirements.txt",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/requirements.txt"
+    },
+    {
+      "operation": "copy",
+      "source": "setup.sh",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/setup.sh"
+    },
+    {
+      "operation": "copy",
+      "source": "setup.bat",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/setup.bat"
+    },
+    {
+      "operation": "copy",
+      "source": "setup.ps1",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/setup.ps1"
+    },
+    {
+      "operation": "copy",
+      "source": "run.sh",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/run.sh"
+    },
+    {
+      "operation": "copy",
+      "source": "run.bat",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/run.bat"
+    },
+    {
+      "operation": "copy",
+      "source": "ui",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/ui"
+    },
+    {
+      "operation": "copy",
+      "source": "ui.yml",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/ui.yml"
+    },
+    {
+      "operation": "copy",
+      "source": "watermark_slayer_gui.py",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/watermark_slayer_gui.py"
+    },
+    {
+      "operation": "copy",
+      "source": "watermark_slayer.py",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/watermark_slayer.py"
+    },
+    {
+      "operation": "copy",
+      "source": "florence_od_runtime.py",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/florence_od_runtime.py"
+    },
+    {
+      "operation": "copy",
+      "source": "florence_od_test.py",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/florence_od_test.py"
+    },
+    {
+      "operation": "copy",
+      "source": "assets/clip-pre.mp4",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/assets/clip-pre.mp4"
+    },
+    {
+      "operation": "copy",
+      "source": "assets/clip-after.mp4",
+      "destination": "archive/ui_history_20260814/pre_cross_platform_snapshot/assets/clip-after.mp4"
+    },
+    {
+      "operation": "move",
+      "source": "run_original.sh",
+      "destination": "archive/ui_history_20260814/legacy_original/run_original.sh"
+    },
+    {
+      "operation": "move",
+      "source": "ui_original",
+      "destination": "archive/ui_history_20260814/legacy_original/ui_original"
+    },
+    {
+      "operation": "move",
+      "source": "ui_original.yml",
+      "destination": "archive/ui_history_20260814/legacy_original/ui_original.yml"
+    },
+    {
+      "operation": "move",
+      "source": "watermark_slayer_gui_original.py",
+      "destination": "archive/ui_history_20260814/legacy_original/watermark_slayer_gui_original.py"
+    },
+    {
+      "operation": "move",
+      "source": "watermark_slayer_original.py",
+      "destination": "archive/ui_history_20260814/legacy_original/watermark_slayer_original.py"
+    }
+  ],
+  "files": [
+    {
+      "path": "pre_cross_platform_snapshot/README.md",
+      "size_bytes": 5073,
+      "sha256": "b7cbfc78b6b9b7d0fd1134f93c8a2b15e49a1975b6b53223394c00bbd0a7aac3"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/assets/clip-after.mp4",
+      "size_bytes": 3854089,
+      "sha256": "a21ef1a5b2eb2dc9163281ad6a7a54e5cc4f3ec5a95f817f04592b27c7f573b1"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/assets/clip-pre.mp4",
+      "size_bytes": 5321234,
+      "sha256": "17cddfd901e0fe15e685b85807df7a9d371ffddeab5eadfafa1eb6c829589bcf"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/download.sh",
+      "size_bytes": 2177,
+      "sha256": "8a21b14a3db357a0451d02722b1907d966f49d0e6bbdc865ada34eea41d4704c"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/florence_od_runtime.py",
+      "size_bytes": 9232,
+      "sha256": "c000e708a114d0ad4dd43f27430fcba90ac1a40efb08555c6159dc1c0aa8ff25"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/florence_od_test.py",
+      "size_bytes": 14728,
+      "sha256": "e7d887698be2886615fb0af8940f310e7ac5f750498819bc8c25f29c29bde216"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/requirements.txt",
+      "size_bytes": 482,
+      "sha256": "4512b5d9854c70ef83ec668063b1ff6a1476fefc252fbb9b183f32a858c3e47a"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/run.bat",
+      "size_bytes": 70,
+      "sha256": "25f118707fe673bcc63dfcb7d962e1ab7185e3ccf2c42887eeeb6dce086aa6ff"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/run.sh",
+      "size_bytes": 97,
+      "sha256": "982897082fc757bf0c950c945dbcc1a69bebe4b93eafefc8fa5877709c594189"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/setup.bat",
+      "size_bytes": 8300,
+      "sha256": "d9d46c0cef487807735b4dd34899c8aadd2b7bb3e9ab2f94330d7d896a4638ea"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/setup.ps1",
+      "size_bytes": 15913,
+      "sha256": "8ad1560329e86e2d91b7a44b5c9f870dca5bdb48c1047037d9fd0485987d33d0"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/setup.sh",
+      "size_bytes": 6711,
+      "sha256": "4ac09def4e70e010f7517e9643b5f0c6b2416518a2be564fde103610472581e8"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/ui/config.json",
+      "size_bytes": 291,
+      "sha256": "73f0890901053c7de025f7813580f5e85b9a0339873463b033f51f8130215c6a"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/ui/detection_classes.json",
+      "size_bytes": 619,
+      "sha256": "4275936bca027bb4a792326d27802036989f9cb3732668c98e8b06375a2f7dbc"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/ui/index.html",
+      "size_bytes": 92820,
+      "sha256": "56b0cd6e53bcfd9dbce23b1c75c9db1ba0ff6eacee09ddd7940bd583ba5ce4c0"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/ui/lang/en.json",
+      "size_bytes": 6122,
+      "sha256": "77c37df4565eb5c2af6cfedad9dfd79ae0c7674be136acde5a0812fd9e998e5a"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/ui/lang/zh.json",
+      "size_bytes": 6124,
+      "sha256": "1d45db066d5265f7e256ca948f7591a0a68e00328517874a6f9e58aaf44252e6"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/ui/themes.css",
+      "size_bytes": 20873,
+      "sha256": "d485443e869cc381a71cf88d527e82e27cafd4345e148ba7599c22afec9edb32"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/ui.yml",
+      "size_bytes": 609,
+      "sha256": "699f6be7ee760612312bd5472a576f7bcb233092d7cf68b1491b581cbed2fb66"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/watermark_slayer.py",
+      "size_bytes": 50583,
+      "sha256": "cb5acef9c97185cf69fbfb6fb1d14e8b0f5245cc77e6a6ea2173a16edc86ac63"
+    },
+    {
+      "path": "pre_cross_platform_snapshot/watermark_slayer_gui.py",
+      "size_bytes": 36677,
+      "sha256": "18efde06c63c2a3bf510da552b5a8e01ebd188d973c09bbaf3eef9ef9f89daa5"
+    },
+    {
+      "path": "legacy_original/run_original.sh",
+      "size_bytes": 317,
+      "sha256": "3ce64779aad31ec59871ecf2522f84a8820ebd9a15bbfd91ae92ba584e45ee8f"
+    },
+    {
+      "path": "legacy_original/ui_original/config.json",
+      "size_bytes": 291,
+      "sha256": "73f0890901053c7de025f7813580f5e85b9a0339873463b033f51f8130215c6a"
+    },
+    {
+      "path": "legacy_original/ui_original/detection_classes.json",
+      "size_bytes": 860,
+      "sha256": "dde6849175e472618e908e6abd3e6a55f1668b5e3fb8480ec8ae6562225086c2"
+    },
+    {
+      "path": "legacy_original/ui_original/index.html",
+      "size_bytes": 92962,
+      "sha256": "dec1e280aae77aa330e78ec475c8aaef901e936f043a02979cb996eaa058987f"
+    },
+    {
+      "path": "legacy_original/ui_original/lang/en.json",
+      "size_bytes": 6130,
+      "sha256": "5ef1de476be45f3b2686d301d959a0a4565661958ed42a544468e2ec65c9680a"
+    },
+    {
+      "path": "legacy_original/ui_original/lang/zh.json",
+      "size_bytes": 6151,
+      "sha256": "9ba81272ea601bcdf6072aad02a1133fb4a8cafaea2c1a46502d4868c24c111f"
+    },
+    {
+      "path": "legacy_original/ui_original/themes.css",
+      "size_bytes": 20873,
+      "sha256": "d485443e869cc381a71cf88d527e82e27cafd4345e148ba7599c22afec9edb32"
+    },
+    {
+      "path": "legacy_original/ui_original.yml",
+      "size_bytes": 577,
+      "sha256": "33352a28d6815e2f14cc1e2d172c0e86ae403ed5387cc23012b2e80d10beb34f"
+    },
+    {
+      "path": "legacy_original/watermark_slayer_gui_original.py",
+      "size_bytes": 36749,
+      "sha256": "536f661c6d2d9a376fc1caa3d66a9282decb8ae1845e5b53ac913d60ace7a3c2"
+    },
+    {
+      "path": "legacy_original/watermark_slayer_original.py",
+      "size_bytes": 49575,
+      "sha256": "013cd376f731df1a64b85ab67dd40078dbe159f9ea0cf971df9fcce6b172f86b"
+    }
+  ]
+}
