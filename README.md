@@ -21,7 +21,7 @@ It uses Florence-2 from Microsoft for watermark identification and LaMA for inpa
 ## Demo
 
 
-https://github.com/CBH2028/watermark_slayer/raw/refs/heads/main/assets/watermark-removal-demo.mp4
+https://github.com/user-attachments/assets/5b22f737-b0b9-4a82-92d5-0828e4b3a2ff
 
 
 ---
