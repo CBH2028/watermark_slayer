@@ -1,0 +1,3 @@
+# Preserve archived files byte-for-byte so manifest SHA256 values survive Git clones.
+* -text
+** -text

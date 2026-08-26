@@ -1,0 +1,195 @@
+{
+  "app": {
+    "title": "Watermark Slayer",
+    "subtitle": "Local AI watermark detection and inpainting"
+  },
+  "sections": {
+    "input": "Input",
+    "output": "Output",
+    "settings": "Processing",
+    "classes": "Class Mapping",
+    "video": "Video",
+    "system": "System",
+    "logs": "Logs",
+    "preview": "Preview"
+  },
+  "modes": {
+    "label": "Mode",
+    "single": "Single File",
+    "single_tooltip": "Process one image or video file.",
+    "batch": "Batch",
+    "batch_tooltip": "Process all supported files in a folder."
+  },
+  "settings": {
+    "gaslight": {
+      "label": "Overwrite output",
+      "sublabel": "",
+      "tooltip": "Allow replacing existing output files."
+    },
+    "ghost": {
+      "label": "Transparent mode",
+      "sublabel": "Images only",
+      "tooltip": "Make detected regions transparent instead of inpainting."
+    },
+    "sigma_detect": {
+      "label": "Max detection area",
+      "tooltip": "Detections larger than this percentage of the image are skipped."
+    },
+    "detection_prompt": {
+      "label": "Detection prompt",
+      "placeholder": "watermark",
+      "tooltip": "Tell the model what to detect, such as watermark, logo, or text."
+    },
+    "output_format": {
+      "label": "Output format",
+      "tooltip": "Auto keeps the original format when possible.",
+      "auto": "Auto",
+      "png": "PNG",
+      "jpg": "JPG",
+      "webp": "WEBP",
+      "mp4": "MP4",
+      "avi": "AVI"
+    }
+  },
+  "video_settings": {
+    "title": "Video Settings",
+    "detection_skip": {
+      "label": "Detection interval",
+      "unit": "frames",
+      "hint": "Higher values are faster but may miss short-lived watermarks."
+    },
+    "fade_in": {
+      "label": "Lead buffer",
+      "hint": "Extend the mask backward in time."
+    },
+    "fade_out": {
+      "label": "Tail buffer",
+      "hint": "Extend the mask forward in time."
+    }
+  },
+  "classes": {
+    "title": "Class Mapping",
+    "group": "Unified category",
+    "raw_classes": "Raw model classes",
+    "output_label": "Output label",
+    "fallback_prompt": "Fallback prompt",
+    "empty": "No classes are available. Check detection_classes.json.",
+    "hint": "Selected raw classes are merged into one output label for mask generation."
+  },
+  "model_settings": {
+    "title": "Florence Model",
+    "model_id": "Model folder",
+    "adapter_dir": "Adapter folder",
+    "max_new_tokens": "Max tokens",
+    "num_beams": "Beams",
+    "use_fast_processor": "Fast processor"
+  },
+  "compare": {
+    "title": "Before / After",
+    "subtitle": "Detection preview and processed output stay side by side.",
+    "waiting": "Waiting",
+    "detecting": "Detection preview",
+    "processing": "Processing",
+    "frame_detected": "Florence frame detected",
+    "frame_processed": "iopaint frame processed",
+    "done": "Processed",
+    "before": "Before",
+    "after": "After",
+    "before_empty": "Select an image or video.",
+    "after_empty": "Detection boxes or processed output will appear here.",
+    "before_frame": "Frame {frame}/{total} · Florence boxes",
+    "after_frame": "Frame {frame}/{total} · iopaint result",
+    "live_detected": "Florence detected frame {frame}/{total}",
+    "live_processed": "iopaint processed frame {frame}/{total}",
+    "play": "Play",
+    "pause": "Pause",
+    "progress": "Progress",
+    "speed": "Speed"
+  },
+  "buttons": {
+    "preview": "Preview Detection",
+    "preview_tooltip": "Check detected regions before processing.",
+    "preview_loading": "Detecting...",
+    "start": "Start Processing",
+    "start_processing": "Processing...",
+    "stop": "Stop",
+    "browse": "Browse",
+    "select_input": "Select Input",
+    "select_output": "Select Output",
+    "try_again": "Run Again",
+    "close": "Close",
+    "copy_error": "Copy Error"
+  },
+  "dropzone": {
+    "title": "Select a file or folder",
+    "subtitle": "Images, videos, and batch folders are supported",
+    "video_hint": "Video file",
+    "image_hint": "Image file",
+    "folder_hint": "Batch folder"
+  },
+  "output": {
+    "placeholder": "Defaults to the input folder"
+  },
+  "status_bar": {
+    "cuda": "CUDA",
+    "ffmpeg": "FFmpeg",
+    "ram": "RAM",
+    "on": "Available",
+    "off": "Unavailable",
+    "cpu_mode": "CPU Mode"
+  },
+  "preview_modal": {
+    "title": "Detection Preview",
+    "prompt": "Prompt:",
+    "detected": "Detected:",
+    "source": "Source:",
+    "regions": "region(s)",
+    "bounding_boxes": "Bounding Boxes",
+    "generated_text": "Florence Generated Text",
+    "predictions_raw": "Raw OD Predictions",
+    "of_image": "% of image",
+    "too_large": "Skipped",
+    "loading": "Detecting...",
+    "loading_hint": "The first run may need to download model files."
+  },
+  "process_modal": {
+    "eyebrow": "Processing Preview",
+    "title": "Live Before / After",
+    "waiting": "Waiting for frames...",
+    "before_empty": "Waiting for the current frame.",
+    "after_empty": "Waiting for the processed frame."
+  },
+  "processing_status": [
+    "Preparing models...",
+    "Detecting watermark regions...",
+    "Building masks...",
+    "Running inpainting...",
+    "Writing output..."
+  ],
+  "logs": {
+    "init": "Interface ready.",
+    "starting": "Processing started.",
+    "first_run_hint": "First run may download model files.",
+    "done": "Processing complete.",
+    "stopped": "Task stopped.",
+    "no_input": "Select an input path first.",
+    "ghost_video_warning": "Transparent mode is not supported for videos. It has been disabled.",
+    "no_ffmpeg": "FFmpeg was not detected. Video output may not include audio.",
+    "api_error": "Backend API is unavailable. Start the app with run.sh or run.bat.",
+    "preview_failed": "Preview failed:",
+    "preview_result": "Detected {total} region(s); {accepted} will be processed.",
+    "cooking": "Processing..."
+  },
+  "labels": {
+    "theme": "Theme",
+    "language": "Language",
+    "input_path": "Input path",
+    "output_path": "Output path",
+    "current_file": "Current input",
+    "idle": "Idle",
+    "progress": "Progress",
+    "ready": "Ready",
+    "not_selected": "Not selected",
+    "api_unavailable": "API disconnected"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "default_group": "watermark",
+  "groups": [
+    {
+      "id": "watermark",
+      "name": "Watermark",
+      "name_zh": "水印",
+      "name_en": "Watermark",
+      "output_label": "watermark",
+      "task": "od",
+      "description": "Single-class Florence-2 watermark detection.",
+      "description_zh": "单类 Florence-2 水印检测。",
+      "description_en": "Single-class Florence-2 watermark detection.",
+      "classes": [
+        {
+          "id": "watermark",
+          "name": "Watermark",
+          "name_zh": "水印",
+          "name_en": "Watermark"
+        }
+      ]
+    }
+  ]
+}

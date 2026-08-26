@@ -1,0 +1,23 @@
+detection_classes:
+- watermark
+detection_group: watermark
+detection_output_label: watermark
+detection_prompt: watermark Gemini Sora visible AI watermark
+detection_skip: 1
+detection_task: od
+fade_in: 2
+fade_out: 2
+florence_adapter_dir: ''
+florence_max_new_tokens: 256
+florence_model_id: /home/h3c/cbh_ws/florence_train/fused_model
+florence_num_beams: 3
+florence_use_fast_processor: true
+force_format: None
+input_path: /home/h3c/cbh_ws/water_marked/inputs/fk_00192.png
+lang: zh
+max_bbox_percent: 100
+mode: single
+output_path: /home/h3c/cbh_ws/water_marked/outputs
+overwrite: true
+theme: dark
+transparent: false
