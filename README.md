@@ -2,7 +2,7 @@
 
 **AI-Powered Watermark Removal Tool using Florence-2 and LaMA Models**
 
-🇨🇳 中文 | 🇬🇧 English
+[🇨🇳 中文](README_zh.md) | 🇬🇧 English
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
@@ -160,5 +160,3 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=CBH2028/watermark_slayer&type=date&legend=top-left)](https://www.star-history.com/#CBH2028/watermark_slayer&type=date&legend=top-left)
-
-
