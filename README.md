@@ -26,6 +26,66 @@ https://github.com/user-attachments/assets/5b22f737-b0b9-4a82-92d5-0828e4b3a2ff
 
 ---
 
+## Model Weights
+
+The production Florence-2-large watermark detector is available at
+**[dpcbh2333/watermark_slayer](https://huggingface.co/dpcbh2333/watermark_slayer)** on Hugging Face.
+It is a standalone FP32 model with the selected LoRA adapter already merged, so PEFT and a separate
+adapter are not required for inference. The Hugging Face repository is private; your Hugging Face
+account must be granted access before downloading it.
+
+### Download
+
+```bash
+python -m pip install --upgrade huggingface_hub
+hf auth login
+hf download dpcbh2333/watermark_slayer --local-dir ./models/watermark_slayer
+```
+
+The same download can be performed from Python after `hf auth login`:
+
+```python
+from huggingface_hub import snapshot_download
+
+model_dir = snapshot_download(
+    repo_id="dpcbh2333/watermark_slayer",
+    local_dir="./models/watermark_slayer",
+    token=True,
+)
+```
+
+### Use with Watermark Slayer
+
+In the GUI, set **Florence Model > Model folder** to the downloaded directory and leave
+**Adapter folder** empty. For CLI processing, pass the model directory directly:
+
+```bash
+python watermark_slayer.py input.mp4 ./output \
+  --florence-model-id ./models/watermark_slayer \
+  --detection-task od \
+  --detection-classes sd_wm,blur_wm
+```
+
+To load the complete model directly with Transformers:
+
+```python
+import torch
+from transformers import AutoProcessor, Florence2ForConditionalGeneration
+
+model_dir = "./models/watermark_slayer"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+processor = AutoProcessor.from_pretrained(model_dir)
+model = Florence2ForConditionalGeneration.from_pretrained(
+    model_dir,
+    torch_dtype=torch.float32,
+).to(device).eval()
+```
+
+The main `model.safetensors` file is about 3.1 GB. Its SHA-256 checksum is
+`929e09900fa893efd83654c381d72c2ebfdb7f7df86ca0f4b92421db7ec0a25a`.
+
+---
+
 ## Features
 
 - **Smart Detection** - AI-powered watermark detection using Florence-2
