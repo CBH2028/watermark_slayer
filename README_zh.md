@@ -217,4 +217,6 @@ python watermark_slayer.py input.png --preview
 
 ## Star 历史
 
-[![Star History Chart](https://api.star-history.com/svg?repos=CBH2028/watermark_slayer&type=date&legend=top-left)](https://www.star-history.com/#CBH2028/watermark_slayer&type=date&legend=top-left)
+[![GitHub Star History](docs/images/star-history.svg)](https://github.com/CBH2028/watermark_slayer/stargazers)
+
+曲线存放在仓库内，并通过 GitHub 官方 Stargazers API 生成，不再受第三方图表服务故障影响。点击图表可查看实时 Star 用户列表；维护者可运行 `python tools/update_star_history.py` 刷新曲线。

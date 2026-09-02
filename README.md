@@ -219,4 +219,6 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=CBH2028/watermark_slayer&type=date&legend=top-left)](https://www.star-history.com/#CBH2028/watermark_slayer&type=date&legend=top-left)
+[![GitHub Star History](docs/images/star-history.svg)](https://github.com/CBH2028/watermark_slayer/stargazers)
+
+This repository-hosted chart is generated from GitHub's official Stargazers API, avoiding third-party chart outages. Click it for the live stargazer list; maintainers can refresh it with `python tools/update_star_history.py`.

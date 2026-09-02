@@ -10,6 +10,7 @@
 
 # Python files - LF preferred
 *.py text eol=lf
+*.svg text eol=lf
 
 # Keep binary files as-is
 *.png binary

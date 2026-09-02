@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="460" viewBox="0 0 960 460" role="img" aria-labelledby="title desc">
+  <title id="title">GitHub star history for CBH2028/watermark_slayer</title>
+  <desc id="desc">0 current stars, generated from the official GitHub Stargazers API.</desc>
+  <defs>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F7F6FF"/>
+    </linearGradient>
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#635BFF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#635BFF" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#827CFF"/>
+      <stop offset="1" stop-color="#5149E8"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-15%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3E3A70" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; }
+      .axis { fill: #777782; font-size: 13px; }
+    </style>
+  </defs>
+  <rect x="14" y="14" width="932" height="428" rx="26" fill="url(#card)" stroke="#E4E2F5" filter="url(#shadow)"/>
+  <circle cx="56" cy="56" r="20" fill="#EFEEFF"/>
+  <path d="M56 43.8l3.7 7.5 8.3 1.2-6 5.8 1.4 8.2-7.4-3.9-7.4 3.9 1.4-8.2-6-5.8 8.3-1.2z" fill="#635BFF"/>
+  <text x="88" y="52" fill="#202024" font-size="20" font-weight="700">GitHub Star History</text>
+  <text x="88" y="75" fill="#777782" font-size="13">CBH2028/watermark_slayer</text>
+  <text x="904" y="55" text-anchor="end" fill="#202024" font-size="28" font-weight="750">0</text>
+  <text x="904" y="76" text-anchor="end" fill="#777782" font-size="12">CURRENT STARS</text>
+  <line x1="78" y1="132.00" x2="914" y2="132.00" stroke="#E7E7F1" stroke-width="1"/><text x="60" y="137.00" text-anchor="end" class="axis">1</text><line x1="78" y1="394.00" x2="914" y2="394.00" stroke="#E7E7F1" stroke-width="1"/><text x="60" y="399.00" text-anchor="end" class="axis">0</text><text x="78.00" y="428" text-anchor="start" class="axis">Aug 14</text><text x="287.00" y="428" text-anchor="middle" class="axis">Aug 19</text><text x="496.00" y="428" text-anchor="middle" class="axis">Aug 24</text><text x="705.00" y="428" text-anchor="middle" class="axis">Aug 29</text><text x="914.00" y="428" text-anchor="end" class="axis">Sep 02</text>
+  <path d="M 78.00 394.00 L 914.00 394.00 L 914.00 394.00 L 78.00 394.00 Z" fill="url(#area)"/>
+  <path d="M 78.00 394.00 L 914.00 394.00" fill="none" stroke="url(#line)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="914.00" cy="394.00" r="7" fill="#FFFFFF" stroke="#635BFF" stroke-width="4"/>
+  <text x="78" y="421" fill="#92929D" font-size="11">OFFICIAL GITHUB STARGAZERS API</text>
+  <text x="882" y="421" text-anchor="end" fill="#92929D" font-size="11">UPDATED 2026-09-02 UTC</text>
+</svg>
