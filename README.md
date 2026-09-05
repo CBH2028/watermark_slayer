@@ -5,6 +5,7 @@
 [🇨🇳 中文](README_zh.md) | 🇬🇧 English
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Hugging Face Model](https://img.shields.io/badge/Hugging%20Face-Model-FFD21E?logo=huggingface&logoColor=000)](https://huggingface.co/dpcbh2333/watermark_slayer)
 
 ---
 
